@@ -53,7 +53,7 @@ export default async function AdminPage() {
   const storageConfigured = isStorageWritable();
 
   return (
-    <main className="mx-auto w-full max-w-2xl px-6 py-10">
+    <main className="mx-auto w-full max-w-5xl px-6 py-10">
       <header className="mb-8 flex items-center justify-between gap-4">
         <h1 className="text-lg font-medium">Carousel</h1>
         <div className="flex items-center gap-4 text-sm">
