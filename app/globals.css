@@ -1,0 +1,76 @@
+/*
+ * Global styles and design tokens.
+ *
+ * The site is a poster: a warm off-white ground, one centred piece of media,
+ * and the hand-lettered lockup pinned near the bottom. It commits to a single
+ * palette rather than following the viewer's colour scheme — a light/dark swap
+ * would fight the artwork and flash between slides.
+ *
+ * Layout is a 12-column grid. The margin and gutter are tokens so the grid can
+ * be retuned in one place to match the Figma frame.
+ */
+
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  /* Warm paper ground and near-black ink, sampled from the mocks. */
+  --color-paper: #e7e5e0;
+  --color-ink: #111111;
+}
+
+:root {
+  /* The 12-column grid. Tune these to match the Figma frame exactly. */
+  --ew-margin: clamp(1rem, 3vw, 3rem);
+  --ew-gutter: clamp(0.75rem, 1.5vw, 1.5rem);
+
+  /*
+   * Safety guard only — NOT the main size control.
+   *
+   * Frames are sized by equal visual area (see `widthPercentForRatio` in
+   * components/carousel.tsx), which already keeps portraits in proportion. This
+   * exists purely so a pathologically tall frame cannot run off the screen.
+   */
+  --ew-media-max-height: 80dvh;
+
+  /* How far the lockup floats above the bottom edge. */
+  --ew-lockup-bottom: clamp(1.25rem, 3.5vh, 2.75rem);
+
+  /*
+   * Size of the lower half of the lockup (services line, email, city, year)
+   * relative to the mark above it. 1 reproduces the supplied artwork exactly.
+   */
+  --ew-lockup-details-scale: 1.15;
+
+  /*
+   * The lockup is narrower than the media it sits under — measured off the
+   * mocks at roughly two thirds of the media column.
+   */
+  --ew-lockup-width: 66%;
+}
+
+html,
+body {
+  height: 100%;
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+body {
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  /* The poster fills the screen; nothing should scroll behind it. */
+  overscroll-behavior: none;
+}
+
+/*
+ * The shared 12-column grid. Any region that must line up with the media
+ * stage uses this, so the stage and the lockup cannot drift apart.
+ */
+.ew-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  column-gap: var(--ew-gutter);
+  padding-inline: var(--ew-margin);
+}
