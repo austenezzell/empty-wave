@@ -32,6 +32,8 @@ import {
 import { getManifest, saveManifest } from "@/lib/media";
 import {
   MANIFEST_TAG,
+  MAX_SLIDE_SECONDS,
+  MIN_SLIDE_SECONDS,
   type SiteMeta,
   type Slide,
   type SlideKind,
@@ -89,6 +91,8 @@ export async function addSlideAction(slide: {
   path: string;
   kind: SlideKind;
   name: string;
+  /** A video's own length, measured in the browser before upload. */
+  durationMs?: number;
 }) {
   await requireAdmin();
 
@@ -98,6 +102,9 @@ export async function addSlideAction(slide: {
     path: slide.path,
     kind: slide.kind,
     name: slide.name,
+    ...(slide.durationMs && slide.durationMs > 0
+      ? { durationMs: Math.round(slide.durationMs) }
+      : {}),
   };
 
   await saveManifest({ ...manifest, slides: [...manifest.slides, entry] });
@@ -142,6 +149,36 @@ export async function deleteSlideAction(id: string) {
   // Drop the file after the manifest, so a failure here leaves an orphaned
   // object rather than a slide pointing at nothing.
   await adminStorage().remove([target.path]);
+  updateTag(MANIFEST_TAG);
+}
+
+/**
+ * Set or clear one slide's hold.
+ *
+ * `null` clears it, which returns the slide to its default: a video plays to
+ * its natural end, an image uses the shared image duration.
+ */
+export async function setSlideDurationAction(id: string, seconds: number | null) {
+  await requireAdmin();
+
+  const manifest = await getManifest({ fresh: true });
+  const slides = manifest.slides.map((slide) => {
+    if (slide.id !== id) return slide;
+
+    if (seconds === null) {
+      const cleared = { ...slide };
+      delete cleared.durationMs;
+      return cleared;
+    }
+
+    const clamped = Math.min(
+      MAX_SLIDE_SECONDS,
+      Math.max(MIN_SLIDE_SECONDS, Math.round(seconds)),
+    );
+    return { ...slide, durationMs: clamped * 1000 };
+  });
+
+  await saveManifest({ ...manifest, slides });
   updateTag(MANIFEST_TAG);
 }
 

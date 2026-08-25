@@ -164,12 +164,15 @@ export function Carousel({ manifest }: { manifest: Manifest }) {
     if (!current || slides.length < 2 || !visible) return;
 
     /*
-     * Videos play to their natural end and advance via `onEnded`; this timer is
-     * only a safety net, sized from the clip's own duration so it can never
-     * truncate playback.
+     * A slide with its own `durationMs` holds for exactly that long. Otherwise a
+     * video plays to its natural end and advances via `onEnded` — the timer then
+     * being only a safety net, sized from the clip's own length so it can never
+     * truncate playback — and an image uses the shared image duration.
      */
     let holdMs: number;
-    if (current.kind === "video") {
+    if (current.durationMs) {
+      holdMs = current.durationMs;
+    } else if (current.kind === "video") {
       holdMs =
         videoDurationMs === null
           ? VIDEO_UNKNOWN_DURATION_MS
@@ -272,7 +275,14 @@ export function Carousel({ manifest }: { manifest: Manifest }) {
               videoRef={videoRef}
               onReady={handleReady}
               onDuration={handleDuration}
-              onEnded={handleEnded}
+              /*
+               * A slide with its own hold is timed, not event-driven: it loops
+               * to fill a hold longer than the clip, and the dwell timer cuts a
+               * hold shorter than it. Advancing on `ended` as well would make a
+               * short clip jump early and defeat the setting.
+               */
+              loop={Boolean(current.durationMs)}
+              onEnded={current.durationMs ? undefined : handleEnded}
             />
           )}
         </div>
@@ -333,6 +343,7 @@ export function Carousel({ manifest }: { manifest: Manifest }) {
 type MediaLayerProps = {
   slide: Slide;
   visible: boolean;
+  loop?: boolean;
   videoRef?: RefObject<HTMLVideoElement | null>;
   onReady?: () => void;
   onDuration?: (seconds: number) => void;
@@ -343,6 +354,7 @@ type MediaLayerProps = {
 function MediaLayer({
   slide,
   visible,
+  loop = false,
   videoRef,
   onReady,
   onDuration,
@@ -439,6 +451,7 @@ function MediaLayer({
           muted
           playsInline
           autoPlay
+          loop={loop}
           preload="auto"
           onLoadedMetadata={handleMetadata}
           onCanPlay={handleLoad}

@@ -14,6 +14,10 @@ export const MANIFEST_TAG = "manifest";
 /** How long a still image holds the screen before advancing, in ms. */
 export const DEFAULT_IMAGE_DURATION_MS = 6000;
 
+/** Bounds for a per-slide hold, in seconds. */
+export const MIN_SLIDE_SECONDS = 1;
+export const MAX_SLIDE_SECONDS = 600;
+
 export type SlideKind = "image" | "video";
 
 export type Slide = {
@@ -24,6 +28,14 @@ export type Slide = {
   kind: SlideKind;
   /** Original filename, shown in the admin list so the client recognises it. */
   name: string;
+  /**
+   * How long this slide holds the screen, in ms.
+   *
+   * Set automatically to a video's own length when it is uploaded, and editable
+   * per slide in the admin. When absent, a video plays to its natural end and an
+   * image falls back to the manifest's `imageDurationMs`.
+   */
+  durationMs?: number;
 };
 
 /** Outward-facing copy, editable by the client at /admin. */
@@ -70,13 +82,19 @@ export function parseManifest(raw: unknown): Manifest {
       typeof candidate.imageDurationMs === "number" && candidate.imageDurationMs > 0
         ? candidate.imageDurationMs
         : DEFAULT_IMAGE_DURATION_MS,
-    slides: slides.filter(
-      (slide): slide is Slide =>
-        !!slide &&
-        typeof slide.id === "string" &&
-        typeof slide.path === "string" &&
-        (slide.kind === "image" || slide.kind === "video"),
-    ),
+    slides: slides
+      .filter(
+        (slide): slide is Slide =>
+          !!slide &&
+          typeof slide.id === "string" &&
+          typeof slide.path === "string" &&
+          (slide.kind === "image" || slide.kind === "video"),
+      )
+      // Drop a malformed duration rather than letting it stall the reel.
+      .map(({ durationMs, ...slide }) => ({
+        ...slide,
+        ...(typeof durationMs === "number" && durationMs > 0 ? { durationMs } : {}),
+      })),
   };
 }
 

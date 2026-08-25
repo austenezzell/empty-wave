@@ -20,9 +20,12 @@ import {
   saveOrderAction,
   setImageDurationAction,
   setSiteMetaAction,
+  setSlideDurationAction,
 } from "@/app/actions";
 import {
   kindFromMimeType,
+  MAX_SLIDE_SECONDS,
+  MIN_SLIDE_SECONDS,
   naturalSize,
   UPLOAD_ACCEPT,
   type Manifest,
@@ -33,6 +36,31 @@ import { browserStorage } from "@/lib/supabase-browser";
 
 /** Supabase's free tier rejects anything larger, so catch it before uploading. */
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+
+/**
+ * A video file's own length, read in the browser before upload.
+ *
+ * Becomes the slide's default hold, so a reel of clips of different lengths
+ * behaves sensibly without anyone setting anything.
+ */
+function readVideoDurationMs(file: File): Promise<number | undefined> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const probe = document.createElement("video");
+
+    const finish = (value?: number) => {
+      URL.revokeObjectURL(url);
+      resolve(value);
+    };
+
+    probe.preload = "metadata";
+    probe.onloadedmetadata = () =>
+      finish(Number.isFinite(probe.duration) ? probe.duration * 1000 : undefined);
+    // A duration we cannot read is not worth failing an upload over.
+    probe.onerror = () => finish(undefined);
+    probe.src = url;
+  });
+}
 
 function formatMegabytes(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
@@ -98,7 +126,12 @@ export function AdminEditor({
         );
         if (upload.error) throw new Error(upload.error.message);
 
-        await addSlideAction({ path: target.path, kind, name: file.name });
+        await addSlideAction({
+          path: target.path,
+          kind,
+          name: file.name,
+          durationMs: kind === "video" ? await readVideoDurationMs(file) : undefined,
+        });
       }
 
       setStatus(`Added ${queue.length} ${queue.length === 1 ? "file" : "files"}.`);
@@ -158,6 +191,19 @@ export function AdminEditor({
         router.refresh();
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "Could not save.");
+      }
+    });
+  }
+
+  function persistSlideDuration(id: string, seconds: number | null) {
+    setError(null);
+    startTransition(async () => {
+      try {
+        await setSlideDurationAction(id, seconds);
+        setStatus(seconds === null ? "Timing cleared." : "Timing saved.");
+        router.refresh();
+      } catch {
+        setError("Could not save that timing.");
       }
     });
   }
@@ -281,6 +327,14 @@ export function AdminEditor({
                 </span>
 
                 <SlidePreview slide={slide} position={position} />
+
+                {slide.kind === "video" && (
+                  <SlideDuration
+                    slide={slide}
+                    disabled={busy}
+                    onSave={(seconds) => persistSlideDuration(slide.id, seconds)}
+                  />
+                )}
 
                 <div
                   className={`flex shrink-0 items-center gap-1 ${locked ? "hidden" : ""}`}
@@ -461,6 +515,68 @@ function SlidePreview({ slide, position }: { slide: Slide; position: number }) {
         </p>
       </div>
     </>
+  );
+}
+
+/**
+ * How long one clip holds the screen.
+ *
+ * Blank means "as long as the video runs" — the natural default, and what a
+ * slide falls back to when the field is cleared.
+ */
+function SlideDuration({
+  slide,
+  disabled,
+  onSave,
+}: {
+  slide: Slide;
+  disabled?: boolean;
+  onSave: (seconds: number | null) => void;
+}) {
+  const saved = slide.durationMs ? Math.round(slide.durationMs / 1000) : null;
+  const [value, setValue] = useState(saved === null ? "" : String(saved));
+
+  function commit() {
+    const trimmed = value.trim();
+
+    if (trimmed === "") {
+      if (saved !== null) onSave(null);
+      return;
+    }
+
+    const seconds = Number(trimmed);
+    if (!Number.isFinite(seconds) || seconds <= 0) {
+      setValue(saved === null ? "" : String(saved));
+      return;
+    }
+    if (Math.round(seconds) === saved) return;
+
+    onSave(seconds);
+  }
+
+  return (
+    <label className="flex shrink-0 items-center gap-1 text-xs text-ink/50">
+      <input
+        type="number"
+        inputMode="numeric"
+        min={MIN_SLIDE_SECONDS}
+        max={MAX_SLIDE_SECONDS}
+        value={value}
+        disabled={disabled}
+        placeholder="auto"
+        aria-label={`Seconds to show ${slide.name}`}
+        onChange={(event) => setValue(event.target.value)}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            event.currentTarget.blur();
+          }
+        }}
+        className="w-14 rounded-md border border-ink/15 bg-ink/5 px-2 py-1 text-ink outline-none focus:border-ink/40"
+      />
+      s
+    </label>
   );
 }
 

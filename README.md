@@ -204,6 +204,22 @@ under `--virtual-time-budget`, so the `ended` path cannot be exercised by the
 screenshot tooling — only the duration-derived net can. Check `ended` in a real
 browser.
 
+## Slide timing
+
+Three levels, most specific first:
+
+1. **A slide's own `durationMs`** — set per slide in the admin. A video's is
+   filled in automatically from its own length at upload; clear the field to
+   return it to the default.
+2. **A video with no duration** plays to its natural end (`onEnded`), with a
+   safety net sized from the clip's length in case that event never fires.
+3. **An image with no duration** uses the manifest's shared `imageDurationMs`.
+
+A video with an explicit duration is timed rather than event-driven: it loops so
+a hold longer than the clip is filled, and the dwell timer cuts a hold shorter
+than it. It deliberately does not advance on `ended`, which would otherwise make
+a short clip jump early and defeat the setting.
+
 ## Preparing media
 
 Camera files are not web files. `scripts/to-web.sh` converts them:
