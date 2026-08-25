@@ -15,7 +15,13 @@
 import { revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { endSession, passwordIsValid, requireAdmin, startSession } from "@/lib/auth";
+import {
+  endSession,
+  missingAuthConfig,
+  passwordIsValid,
+  requireAdmin,
+  startSession,
+} from "@/lib/auth";
 import { getManifest, saveManifest } from "@/lib/media";
 import {
   MANIFEST_TAG,
@@ -35,6 +41,15 @@ function slugifyFilename(name: string) {
 }
 
 export async function signInAction(_prev: string | null, formData: FormData) {
+  // Report misconfiguration as a message rather than throwing: a thrown error
+  // here renders as a generic error page that says nothing useful.
+  const missing = missingAuthConfig();
+  if (missing.length > 0) {
+    return `Server is not configured: ${missing.join(" and ")} ${
+      missing.length > 1 ? "are" : "is"
+    } not set in this environment.`;
+  }
+
   const password = String(formData.get("password") ?? "");
   if (!passwordIsValid(password)) return "That password is not right.";
   await startSession();

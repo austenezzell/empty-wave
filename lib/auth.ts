@@ -14,6 +14,19 @@ import { cookies } from "next/headers";
 const COOKIE_NAME = "ew_admin";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30; // 30 days
 
+/**
+ * Which required admin variables are missing, if any.
+ *
+ * Without this, an unset variable surfaced as a thrown error from inside a
+ * server action — which production renders as a generic "couldn't load" page
+ * with an opaque id, giving no clue that configuration was the problem.
+ */
+export function missingAuthConfig() {
+  return (["ADMIN_PASSWORD", "ADMIN_SESSION_SECRET"] as const).filter(
+    (name) => !process.env[name],
+  );
+}
+
 function sessionSecret() {
   const secret = process.env.ADMIN_SESSION_SECRET;
   if (!secret) throw new Error("Missing ADMIN_SESSION_SECRET.");
