@@ -141,6 +141,24 @@ original standalone SVGs imply.
 > nothing at all — with no error and no visual hint that it is being ignored.
 
 
+### Checking mobile layout
+
+**Headless Chrome will lie to you below ~500px.** `--window-size=390,832`
+lays the page out at a 500px viewport and then crops the screenshot to 390 —
+so content appears shifted and clipped, and every measurement is wrong, with
+no indication anything is off.
+
+To measure a real phone viewport, render the page in an iframe, whose viewport
+is not subject to that floor:
+
+```tsx
+// temporary route, e.g. app/probe-tmp/page.tsx — note: a folder starting with
+// "_" is private in Next and will 404
+<iframe src="/" style={{ width: "390px", height: "832px", border: 0 }} />
+```
+
+Screenshot the containing page and crop to the iframe.
+
 ## Cursors
 
 The step zones use the hand-drawn arrows in `public/cursors/`. Sources are in

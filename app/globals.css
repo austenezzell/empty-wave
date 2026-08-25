@@ -41,12 +41,13 @@
   /*
    * Size of the lower half of the lockup (services line, email, city, year)
    * relative to the mark above it. 1 reproduces the supplied artwork exactly.
+   * Fallback only — `LOCKUP_SIZING` steps this per breakpoint.
    */
   --ew-lockup-details-scale: 1.54;
 
   /*
    * Lockup width, as a percentage of the media column. This is only the
-   * fallback: `LOCKUP_WIDTH` in components/carousel.tsx steps it at the same
+   * fallback: `LOCKUP_SIZING` in components/carousel.tsx steps it at the same
    * breakpoints as the column span, which is the fact it has to track.
    */
   --ew-lockup-width: 36%;

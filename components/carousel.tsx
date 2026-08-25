@@ -53,15 +53,22 @@ const VIDEO_UNKNOWN_DURATION_MS = 60_000;
 const COLUMN = "col-span-12 md:col-start-3 md:col-span-8 lg:col-start-5 lg:col-span-4";
 
 /**
- * Lockup width, stepped at the same breakpoints as COLUMN above.
+ * Lockup sizing, stepped at the same breakpoints as COLUMN above.
  *
  * Written as Tailwind variants on the same element rather than as raw
- * `@media (min-width: 768px)` blocks in the stylesheet: the width has to track
- * the column span (12 -> 8 -> 4), and keeping both halves of that fact on one
- * element means they cannot drift apart in different notations.
+ * `@media (min-width: 768px)` blocks in the stylesheet: both values have to
+ * track the column span (12 -> 8 -> 4), and keeping every part of that fact on
+ * one element means they cannot drift apart in different notations.
+ *
+ * The lower block is scaled up on small screens. It is sized against the mark,
+ * so at one ratio the services line, email and colophon shrink with the whole
+ * lockup and end up too small to read on a phone — the email in particular,
+ * which is the one thing on the page anybody needs to act on.
  */
-const LOCKUP_WIDTH =
-  "[--ew-lockup-width:36%] md:[--ew-lockup-width:46%] lg:[--ew-lockup-width:66%]";
+const LOCKUP_SIZING = [
+  "[--ew-lockup-width:36%] md:[--ew-lockup-width:46%] lg:[--ew-lockup-width:66%]",
+  "[--ew-lockup-details-scale:2.1] sm:[--ew-lockup-details-scale:1.75] md:[--ew-lockup-details-scale:1.54]",
+].join(" ");
 
 /**
  * Where the back zone ends and the forward zone begins. One value, used by both,
@@ -229,7 +236,7 @@ export function Carousel({ manifest }: { manifest: Manifest }) {
         className="ew-grid pointer-events-none absolute inset-x-0 z-30"
         style={{ bottom: "var(--ew-lockup-bottom)" }}
       >
-        <div className={`${COLUMN} ${LOCKUP_WIDTH} flex justify-center`}>
+        <div className={`${COLUMN} ${LOCKUP_SIZING} flex justify-center`}>
           <Lockup style={{ width: "var(--ew-lockup-width)" }} />
         </div>
       </div>
