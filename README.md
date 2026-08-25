@@ -92,6 +92,10 @@ one, with no special-casing between them.
 
 All three were produced by `scripts/to-web.sh` from the originals.
 
+While storage is unconfigured, `/admin` shows the same placeholders in a
+read-only state with a banner explaining why, rather than reporting "Nothing
+added yet" while six photos are live on the site.
+
 The fallback is gated on `isStorageConfigured()`, so it disappears the moment
 the environment variables are set. A configured project with an empty bucket
 renders an empty poster rather than stand-in artwork.

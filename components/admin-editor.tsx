@@ -37,7 +37,13 @@ function formatMegabytes(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
 }
 
-export function AdminEditor({ manifest }: { manifest: Manifest }) {
+export function AdminEditor({
+  manifest,
+  storageConfigured,
+}: {
+  manifest: Manifest;
+  storageConfigured: boolean;
+}) {
   const router = useRouter();
 
   const [slides, setSlides] = useState<Slide[]>(manifest.slides);
@@ -169,9 +175,28 @@ export function AdminEditor({ manifest }: { manifest: Manifest }) {
   }
 
   const busy = uploading || pending;
+  // Nothing can be saved without the service-role key, so the whole editor is
+  // read-only until Supabase is connected.
+  const locked = !storageConfigured;
 
   return (
     <div className="flex flex-col gap-8">
+      {locked && (
+        <div className="rounded-lg border border-ink/20 bg-ink/5 p-4 text-sm">
+          <p className="font-medium">Supabase is not connected.</p>
+          <p className="mt-1 text-ink/70">
+            The site is showing {manifest.slides.length} built-in placeholder
+            photos, listed below. They are part of the code rather than
+            uploads, so they cannot be edited or removed here — and they
+            disappear on their own as soon as real media exists.
+          </p>
+          <p className="mt-2 text-ink/70">
+            Add your Supabase URL and keys to <code>.env.local</code>, then
+            restart the dev server to start managing media.
+          </p>
+        </div>
+      )}
+
       <section className="flex flex-col gap-3">
         <h2 className="text-xs tracking-widest text-ink/50 uppercase">Add media</h2>
 
@@ -179,7 +204,7 @@ export function AdminEditor({ manifest }: { manifest: Manifest }) {
           onDragOver={(event) => event.preventDefault()}
           onDrop={(event) => {
             event.preventDefault();
-            void uploadFiles(event.dataTransfer.files);
+            if (!locked) void uploadFiles(event.dataTransfer.files);
           }}
           className="rounded-lg border border-dashed border-ink/25 p-6 text-center"
         >
@@ -187,7 +212,7 @@ export function AdminEditor({ manifest }: { manifest: Manifest }) {
           <button
             type="button"
             onClick={() => fileInput.current?.click()}
-            disabled={busy}
+            disabled={busy || locked}
             className="mt-3 rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:bg-ink/85 disabled:opacity-50"
           >
             Choose files
@@ -218,7 +243,7 @@ export function AdminEditor({ manifest }: { manifest: Manifest }) {
           <h2 className="text-xs tracking-widest text-ink/50 uppercase">
             Order ({slides.length})
           </h2>
-          {orderIsDirty && (
+          {orderIsDirty && !locked && (
             <button
               type="button"
               onClick={persistOrder}
@@ -237,7 +262,7 @@ export function AdminEditor({ manifest }: { manifest: Manifest }) {
             {slides.map((slide, position) => (
               <li
                 key={slide.id}
-                draggable
+                draggable={!locked}
                 onDragStart={() => {
                   dragIndex.current = position;
                 }}
@@ -262,7 +287,9 @@ export function AdminEditor({ manifest }: { manifest: Manifest }) {
                   </p>
                 </div>
 
-                <div className="flex shrink-0 items-center gap-1">
+                <div
+                  className={`flex shrink-0 items-center gap-1 ${locked ? "hidden" : ""}`}
+                >
                   <IconButton
                     label="Move up"
                     disabled={position === 0 || busy}
@@ -306,6 +333,7 @@ export function AdminEditor({ manifest }: { manifest: Manifest }) {
             type="text"
             value={title}
             maxLength={120}
+            disabled={locked}
             onChange={(event) => setTitle(event.target.value)}
             className="rounded-md border border-ink/15 bg-ink/5 px-3 py-2 text-ink outline-none focus:border-ink/40"
           />
@@ -317,6 +345,7 @@ export function AdminEditor({ manifest }: { manifest: Manifest }) {
             value={description}
             maxLength={300}
             rows={3}
+            disabled={locked}
             onChange={(event) => setDescription(event.target.value)}
             className="resize-y rounded-md border border-ink/15 bg-ink/5 px-3 py-2 text-ink outline-none focus:border-ink/40"
           />
@@ -331,6 +360,7 @@ export function AdminEditor({ manifest }: { manifest: Manifest }) {
             onClick={persistMeta}
             disabled={
               busy ||
+              locked ||
               !title.trim() ||
               !description.trim() ||
               (title === manifest.meta.title &&
@@ -361,7 +391,9 @@ export function AdminEditor({ manifest }: { manifest: Manifest }) {
           <button
             type="button"
             onClick={persistDuration}
-            disabled={busy || seconds === Math.round(manifest.imageDurationMs / 1000)}
+            disabled={
+              busy || locked || seconds === Math.round(manifest.imageDurationMs / 1000)
+            }
             className="rounded-md border border-ink/20 px-3 py-1.5 text-sm transition hover:bg-ink/10 disabled:opacity-40"
           >
             Save

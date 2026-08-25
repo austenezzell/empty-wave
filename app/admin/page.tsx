@@ -14,6 +14,8 @@ import { AdminEditor } from "@/components/admin-editor";
 import { LoginForm } from "@/components/login-form";
 import { isSignedIn } from "@/lib/auth";
 import { getManifest } from "@/lib/media";
+import { PLACEHOLDER_MANIFEST } from "@/lib/placeholders";
+import { isStorageConfigured } from "@/lib/storage-url";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +29,14 @@ export default async function AdminPage() {
   }
 
   const manifest = await getManifest({ fresh: true });
+
+  /*
+   * Mirror what the public page is actually showing. Without Supabase the site
+   * falls back to the built-in placeholders, and an editor reading "Nothing
+   * added yet" while six photos are live is simply confusing.
+   */
+  const storageConfigured = isStorageConfigured();
+  const displayed = storageConfigured ? manifest : PLACEHOLDER_MANIFEST;
 
   return (
     <main className="mx-auto w-full max-w-2xl px-6 py-10">
@@ -53,8 +63,9 @@ export default async function AdminPage() {
         would otherwise keep showing the list as it was on first render.
       */}
       <AdminEditor
-        key={manifest.slides.map((slide) => slide.id).join(",")}
-        manifest={manifest}
+        key={displayed.slides.map((slide) => slide.id).join(",")}
+        manifest={displayed}
+        storageConfigured={storageConfigured}
       />
     </main>
   );
