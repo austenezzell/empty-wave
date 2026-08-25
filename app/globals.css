@@ -42,7 +42,7 @@
    * Size of the lower half of the lockup (services line, email, city, year)
    * relative to the mark above it. 1 reproduces the supplied artwork exactly.
    */
-  --ew-lockup-details-scale: 1.15;
+  --ew-lockup-details-scale: 1.54;
 
   /*
    * The lockup is narrower than the media it sits under — measured off the
