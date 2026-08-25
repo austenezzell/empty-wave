@@ -60,6 +60,18 @@ const COLUMN = "col-span-12 md:col-start-3 md:col-span-8 lg:col-start-5 lg:col-s
 const REFERENCE_RATIO = 3 / 2;
 
 /**
+ * Hand-drawn arrow cursors for the step zones.
+ *
+ * PNG rather than the supplied SVG, and 128px wide, because both matter:
+ * browsers ignore any cursor image larger than 128px in either dimension, and
+ * Safari does not render SVG cursors at all. The hotspot is the centre of the
+ * stroke, so the arrow reads as the pointer itself rather than trailing it.
+ * The keyword after the comma is the fallback if the image cannot load.
+ */
+const CURSOR_PREV = "url(/cursors/arrow-left.png) 64 9, w-resize";
+const CURSOR_NEXT = "url(/cursors/arrow-right.png) 64 9, e-resize";
+
+/**
  * Width (as a percentage of the column) that gives this aspect ratio the same
  * area as a REFERENCE_RATIO frame at full width.
  *
@@ -205,13 +217,15 @@ export function Carousel({ manifest }: { manifest: Manifest }) {
           <button
             type="button"
             onClick={() => advance(-1)}
-            className="absolute inset-y-0 left-0 z-20 w-1/3 cursor-w-resize focus:outline-none"
+            className="absolute inset-y-0 left-0 z-20 w-1/3 focus:outline-none"
+            style={{ cursor: CURSOR_PREV }}
             aria-label="Previous slide"
           />
           <button
             type="button"
             onClick={() => advance(1)}
-            className="absolute inset-y-0 right-0 z-20 w-1/3 cursor-e-resize focus:outline-none"
+            className="absolute inset-y-0 right-0 z-20 w-1/3 focus:outline-none"
+            style={{ cursor: CURSOR_NEXT }}
             aria-label="Next slide"
           />
         </>

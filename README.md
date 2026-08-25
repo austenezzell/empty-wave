@@ -137,6 +137,29 @@ and the intrinsic `361.83 × 222.3` viewBox supplies the aspect ratio, so the
 artwork scales without ever being distorted. To swap it, overwrite the file and
 update the two intrinsic constants if the viewBox changed.
 
+## Cursors
+
+The left and right step zones use the hand-drawn arrows in `public/cursors/`.
+
+Two constraints shaped how these are delivered, and both bite silently:
+
+- **Browsers ignore any cursor image larger than 128px** in either dimension —
+  no warning, the cursor just stays default. The source arrows are ~750px wide,
+  so they are rasterised down to 128px.
+- **Safari does not render SVG cursors at all**, so they ship as PNG.
+
+Regenerate them from the SVGs after any edit:
+
+```bash
+# render at 128px wide on a transparent background
+chrome --headless=new --default-background-color=00000000 \
+  --window-size=128,19 --screenshot=arrow-right.png page-with-svg.html
+```
+
+The hotspot is the centre of the stroke (`64 9`), so the arrow reads as the
+pointer itself. Move it to the arrowhead end if you would rather the tail
+trailed behind.
+
 ## Video behaviour
 
 A video plays **to its natural end**, then the reel advances. It is never cut
