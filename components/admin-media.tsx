@@ -1,8 +1,9 @@
 "use client";
 
 /**
- * The client-facing editor: add media, drag to reorder, delete, and set how
- * long stills hold the screen.
+ * Managing the reel: add media, drag to reorder, delete, set per-clip timing.
+ *
+ * The site's own copy lives on its own page — see components/admin-details.tsx.
  *
  * Uploads deliberately bypass the Next server. For each file the server mints a
  * one-shot signed URL and the browser PUTs straight to Supabase Storage, which
@@ -19,7 +20,6 @@ import {
   deleteSlideAction,
   saveOrderAction,
   setImageDurationAction,
-  setSiteMetaAction,
   setSlideDurationAction,
 } from "@/app/actions";
 import {
@@ -66,7 +66,7 @@ function formatMegabytes(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
 }
 
-export function AdminEditor({
+export function AdminMedia({
   manifest,
   storageConfigured,
 }: {
@@ -77,8 +77,6 @@ export function AdminEditor({
 
   const [slides, setSlides] = useState<Slide[]>(manifest.slides);
   const [seconds, setSeconds] = useState(Math.round(manifest.imageDurationMs / 1000));
-  const [title, setTitle] = useState(manifest.meta.title);
-  const [description, setDescription] = useState(manifest.meta.description);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -182,19 +180,6 @@ export function AdminEditor({
     });
   }
 
-  function persistMeta() {
-    setError(null);
-    startTransition(async () => {
-      try {
-        await setSiteMetaAction({ title, description });
-        setStatus("Site details saved.");
-        router.refresh();
-      } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "Could not save.");
-      }
-    });
-  }
-
   function persistSlideDuration(id: string, seconds: number | null) {
     setError(null);
     startTransition(async () => {
@@ -229,22 +214,6 @@ export function AdminEditor({
 
   return (
     <div className="flex flex-col gap-8">
-      {locked && (
-        <div className="rounded-lg border border-ink/20 bg-ink/5 p-4 text-sm">
-          <p className="font-medium">Supabase is not connected.</p>
-          <p className="mt-1 text-ink/70">
-            The site is showing {manifest.slides.length} built-in placeholder
-            photos, listed below. They are part of the code rather than
-            uploads, so they cannot be edited or removed here — and they
-            disappear on their own as soon as real media exists.
-          </p>
-          <p className="mt-2 text-ink/70">
-            Add your Supabase URL and keys to <code>.env.local</code>, then
-            restart the dev server to start managing media.
-          </p>
-        </div>
-      )}
-
       {(status || error) && (
         <p className={`text-sm ${error ? "text-red-700" : "text-ink/60"}`}>
           {error ?? status}
@@ -255,210 +224,150 @@ export function AdminEditor({
         Two columns from `lg`: the site's own copy on the left, the reel it
         describes on the right. Below that they stack in the same order.
       */}
-      <div className="grid gap-8 lg:grid-cols-5">
-        <div className="flex flex-col gap-8 lg:col-span-2">
-          <section className="flex flex-col gap-3">
-            <h2 className="text-xs tracking-widest text-ink/50 uppercase">
-              Site details
-            </h2>
-            <p className="text-xs text-ink/40">
-              Used for the browser tab, link previews when the site is shared, and
-              how search engines and AI assistants describe the site.
-            </p>
+      <section className="flex flex-col gap-3">
+        <h2 className="text-xs tracking-widest text-ink/50 uppercase">Add media</h2>
 
-            <label className="flex flex-col gap-1 text-sm text-ink/70">
-              Title
-              <input
-                type="text"
-                value={title}
-                maxLength={120}
-                disabled={locked}
-                onChange={(event) => setTitle(event.target.value)}
-                className="rounded-md border border-ink/15 bg-ink/5 px-3 py-2 text-ink outline-none focus:border-ink/40"
-              />
-            </label>
+        <div
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={(event) => {
+            event.preventDefault();
+            if (!locked) void uploadFiles(event.dataTransfer.files);
+          }}
+          className="rounded-lg border border-dashed border-ink/25 p-6 text-center"
+        >
+          <p className="text-sm text-ink/60">Drop photos or videos here, or</p>
+          <button
+            type="button"
+            onClick={() => fileInput.current?.click()}
+            disabled={busy}
+            className="mt-3 rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:bg-ink/85 disabled:opacity-50"
+          >
+            Choose files
+          </button>
+          <p className="mt-3 text-xs text-ink/35">
+            JPEG, PNG, WebP, AVIF, MP4 or WebM — up to 50MB each.
+          </p>
 
-            <label className="flex flex-col gap-1 text-sm text-ink/70">
-              Description
-              <textarea
-                value={description}
-                maxLength={300}
-                rows={3}
-                disabled={locked}
-                onChange={(event) => setDescription(event.target.value)}
-                className="resize-y rounded-md border border-ink/15 bg-ink/5 px-3 py-2 text-ink outline-none focus:border-ink/40"
-              />
-              <span className="text-xs text-ink/35">
-                {description.length}/300 — search results usually cut off near 160.
-              </span>
-            </label>
-
-            <div>
-              <button
-                type="button"
-                onClick={persistMeta}
-                disabled={
-                  busy ||
-                  !title.trim() ||
-                  !description.trim() ||
-                  (title === manifest.meta.title &&
-                    description === manifest.meta.description)
-                }
-                className="rounded-md border border-ink/20 px-3 py-1.5 text-sm transition hover:bg-ink/10 disabled:opacity-40"
-              >
-                Save details
-              </button>
-            </div>
-          </section>
+          <input
+            ref={fileInput}
+            type="file"
+            accept={UPLOAD_ACCEPT}
+            multiple
+            hidden
+            onChange={(event) => void uploadFiles(event.target.files)}
+          />
         </div>
+      </section>
 
-        <div className="flex flex-col gap-8 lg:col-span-3">
-          <section className="flex flex-col gap-3">
-            <h2 className="text-xs tracking-widest text-ink/50 uppercase">Add media</h2>
-
-            <div
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => {
-                event.preventDefault();
-                if (!locked) void uploadFiles(event.dataTransfer.files);
-              }}
-              className="rounded-lg border border-dashed border-ink/25 p-6 text-center"
+      <section className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-xs tracking-widest text-ink/50 uppercase">
+            Order ({slides.length})
+          </h2>
+          {orderIsDirty && !locked && (
+            <button
+              type="button"
+              onClick={persistOrder}
+              disabled={busy}
+              className="rounded-md bg-ink px-3 py-1.5 text-sm font-medium text-paper transition hover:bg-ink/85 disabled:opacity-50"
             >
-              <p className="text-sm text-ink/60">Drop photos or videos here, or</p>
-              <button
-                type="button"
-                onClick={() => fileInput.current?.click()}
-                disabled={busy}
-                className="mt-3 rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:bg-ink/85 disabled:opacity-50"
-              >
-                Choose files
-              </button>
-              <p className="mt-3 text-xs text-ink/35">
-                JPEG, PNG, WebP, AVIF, MP4 or WebM — up to 50MB each.
-              </p>
-
-              <input
-                ref={fileInput}
-                type="file"
-                accept={UPLOAD_ACCEPT}
-                multiple
-                hidden
-                onChange={(event) => void uploadFiles(event.target.files)}
-              />
-            </div>
-          </section>
-
-          <section className="flex flex-col gap-3">
-            <div className="flex items-center justify-between gap-4">
-              <h2 className="text-xs tracking-widest text-ink/50 uppercase">
-                Order ({slides.length})
-              </h2>
-              {orderIsDirty && !locked && (
-                <button
-                  type="button"
-                  onClick={persistOrder}
-                  disabled={busy}
-                  className="rounded-md bg-ink px-3 py-1.5 text-sm font-medium text-paper transition hover:bg-ink/85 disabled:opacity-50"
-                >
-                  Save order
-                </button>
-              )}
-            </div>
-
-            {slides.length === 0 ? (
-              <p className="text-sm text-ink/40">Nothing added yet.</p>
-            ) : (
-              <ul className="flex flex-col gap-2">
-                {slides.map((slide, position) => (
-                  <li
-                    key={slide.id}
-                    draggable={!locked}
-                    onDragStart={() => {
-                      dragIndex.current = position;
-                    }}
-                    onDragOver={(event) => event.preventDefault()}
-                    onDrop={(event) => {
-                      event.preventDefault();
-                      if (dragIndex.current !== null) move(dragIndex.current, position);
-                      dragIndex.current = null;
-                    }}
-                    className="flex items-center gap-3 rounded-lg border border-ink/10 bg-ink/5 p-2.5"
-                  >
-                    <span className="w-6 shrink-0 cursor-grab text-center text-ink/30">
-                      ⠿
-                    </span>
-
-                    <SlidePreview slide={slide} position={position} />
-
-                    {slide.kind === "video" && (
-                      <SlideDuration
-                        slide={slide}
-                        disabled={busy}
-                        onSave={(seconds) => persistSlideDuration(slide.id, seconds)}
-                      />
-                    )}
-
-                    <div
-                      className={`flex shrink-0 items-center gap-1 ${locked ? "hidden" : ""}`}
-                    >
-                      <IconButton
-                        label="Move up"
-                        disabled={position === 0 || busy}
-                        onClick={() => move(position, position - 1)}
-                      >
-                        ↑
-                      </IconButton>
-                      <IconButton
-                        label="Move down"
-                        disabled={position === slides.length - 1 || busy}
-                        onClick={() => move(position, position + 1)}
-                      >
-                        ↓
-                      </IconButton>
-                      <IconButton
-                        label={`Remove ${slide.name}`}
-                        disabled={busy}
-                        onClick={() => remove(slide)}
-                      >
-                        ×
-                      </IconButton>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          <section className="flex flex-col gap-3">
-            <h2 className="text-xs tracking-widest text-ink/50 uppercase">Timing</h2>
-            <div className="flex flex-wrap items-center gap-3">
-              <label className="flex items-center gap-2 text-sm text-ink/70">
-                Photos hold for
-                <input
-                  type="number"
-                  min={1}
-                  max={60}
-                  value={seconds}
-                  onChange={(event) => setSeconds(Number(event.target.value))}
-                  className="w-20 rounded-md border border-ink/15 bg-ink/5 px-2 py-1 text-ink outline-none focus:border-ink/40"
-                />
-                seconds
-              </label>
-              <button
-                type="button"
-                onClick={persistDuration}
-                disabled={busy || seconds === Math.round(manifest.imageDurationMs / 1000)}
-                className="rounded-md border border-ink/20 px-3 py-1.5 text-sm transition hover:bg-ink/10 disabled:opacity-40"
-              >
-                Save
-              </button>
-            </div>
-            <p className="text-xs text-ink/35">
-              Videos always play to the end, so this only affects photos.
-            </p>
-          </section>
+              Save order
+            </button>
+          )}
         </div>
-      </div>
+
+        {slides.length === 0 ? (
+          <p className="text-sm text-ink/40">Nothing added yet.</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {slides.map((slide, position) => (
+              <li
+                key={slide.id}
+                draggable={!locked}
+                onDragStart={() => {
+                  dragIndex.current = position;
+                }}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  if (dragIndex.current !== null) move(dragIndex.current, position);
+                  dragIndex.current = null;
+                }}
+                className="flex items-center gap-3 rounded-lg border border-ink/10 bg-ink/5 p-2.5"
+              >
+                <span className="w-6 shrink-0 cursor-grab text-center text-ink/30">
+                  ⠿
+                </span>
+
+                <SlidePreview slide={slide} position={position} />
+
+                {slide.kind === "video" && (
+                  <SlideDuration
+                    slide={slide}
+                    disabled={busy}
+                    onSave={(seconds) => persistSlideDuration(slide.id, seconds)}
+                  />
+                )}
+
+                <div
+                  className={`flex shrink-0 items-center gap-1 ${locked ? "hidden" : ""}`}
+                >
+                  <IconButton
+                    label="Move up"
+                    disabled={position === 0 || busy}
+                    onClick={() => move(position, position - 1)}
+                  >
+                    ↑
+                  </IconButton>
+                  <IconButton
+                    label="Move down"
+                    disabled={position === slides.length - 1 || busy}
+                    onClick={() => move(position, position + 1)}
+                  >
+                    ↓
+                  </IconButton>
+                  <IconButton
+                    label={`Remove ${slide.name}`}
+                    disabled={busy}
+                    onClick={() => remove(slide)}
+                  >
+                    ×
+                  </IconButton>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-xs tracking-widest text-ink/50 uppercase">Timing</h2>
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-2 text-sm text-ink/70">
+            Photos hold for
+            <input
+              type="number"
+              min={1}
+              max={60}
+              value={seconds}
+              onChange={(event) => setSeconds(Number(event.target.value))}
+              className="w-20 rounded-md border border-ink/15 bg-ink/5 px-2 py-1 text-ink outline-none focus:border-ink/40"
+            />
+            seconds
+          </label>
+          <button
+            type="button"
+            onClick={persistDuration}
+            disabled={busy || seconds === Math.round(manifest.imageDurationMs / 1000)}
+            className="rounded-md border border-ink/20 px-3 py-1.5 text-sm transition hover:bg-ink/10 disabled:opacity-40"
+          >
+            Save
+          </button>
+        </div>
+        <p className="text-xs text-ink/35">
+          Videos always play to the end, so this only affects photos.
+        </p>
+      </section>
     </div>
   );
 }
