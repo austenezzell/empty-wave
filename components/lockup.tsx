@@ -71,7 +71,8 @@ export function Lockup({
           href={`mailto:${EMAIL}`}
           aria-label={`Email ${EMAIL}`}
           title={EMAIL}
-          className="group block"
+          // Re-enables clicks inside the click-through lockup wrapper.
+          className="group pointer-events-auto block"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img

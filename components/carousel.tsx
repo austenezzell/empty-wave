@@ -202,8 +202,14 @@ export function Carousel({ manifest }: { manifest: Manifest }) {
         The lockup is pinned to the page, not to the media — that is what makes
         it fall below a short frame and overlay a tall one.
       */}
+      {/*
+        Above the step zones (z-20) so the email link stays clickable now that
+        "next" covers everything but the left third — but click-through
+        elsewhere, so the rest of the lockup still advances the reel. Only the
+        mailto anchor re-enables pointer events.
+      */}
       <div
-        className="ew-grid absolute inset-x-0 z-10"
+        className="ew-grid pointer-events-none absolute inset-x-0 z-30"
         style={{ bottom: "var(--ew-lockup-bottom)" }}
       >
         <div className={`${COLUMN} flex justify-center`}>
@@ -213,7 +219,17 @@ export function Carousel({ manifest }: { manifest: Manifest }) {
 
       {slides.length > 1 && (
         <>
-          {/* Invisible tap targets: left third steps back, right third forward. */}
+          {/*
+            Invisible tap targets. The left third steps back; everything else —
+            including the photograph itself — steps forward, so clicking the
+            image advances the reel.
+
+            Forward deliberately takes the larger share: it is the common
+            action, and at every breakpoint the media sits inside it. Only on
+            narrow screens, where the image spans nearly the full width, does
+            its left edge fall into the back zone — which is the familiar
+            tap-left-to-go-back behaviour rather than a conflict.
+          */}
           <button
             type="button"
             onClick={() => advance(-1)}
@@ -224,7 +240,7 @@ export function Carousel({ manifest }: { manifest: Manifest }) {
           <button
             type="button"
             onClick={() => advance(1)}
-            className="absolute inset-y-0 right-0 z-20 w-1/3 focus:outline-none"
+            className="absolute inset-y-0 right-0 left-1/3 z-20 focus:outline-none"
             style={{ cursor: CURSOR_NEXT }}
             aria-label="Next slide"
           />
