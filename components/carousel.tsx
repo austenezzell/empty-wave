@@ -34,7 +34,7 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
 
 import { Lockup } from "@/components/lockup";
 import { publicUrl } from "@/lib/storage-url";
-import type { Manifest, Slide } from "@/lib/slides";
+import { naturalSize, type Manifest, type Slide } from "@/lib/slides";
 
 /**
  * Safety net for a video that never fires `ended` (bad codec, stalled buffer).
@@ -51,6 +51,23 @@ const VIDEO_UNKNOWN_DURATION_MS = 60_000;
  * drift apart. Four of twelve columns on desktop, matching the mocks.
  */
 const COLUMN = "col-span-12 md:col-start-3 md:col-span-8 lg:col-start-5 lg:col-span-4";
+
+/**
+ * Lockup width, stepped at the same breakpoints as COLUMN above.
+ *
+ * Written as Tailwind variants on the same element rather than as raw
+ * `@media (min-width: 768px)` blocks in the stylesheet: the width has to track
+ * the column span (12 -> 8 -> 4), and keeping both halves of that fact on one
+ * element means they cannot drift apart in different notations.
+ */
+const LOCKUP_WIDTH =
+  "[--ew-lockup-width:36%] md:[--ew-lockup-width:46%] lg:[--ew-lockup-width:66%]";
+
+/**
+ * Where the back zone ends and the forward zone begins. One value, used by both,
+ * so the two can never overlap or leave a dead strip between them.
+ */
+const BACK_ZONE_WIDTH = "33.3333%";
 
 /**
  * The aspect ratio that defines "full width" — a 3:2 landscape, the shape of
@@ -203,16 +220,16 @@ export function Carousel({ manifest }: { manifest: Manifest }) {
         it fall below a short frame and overlay a tall one.
       */}
       {/*
-        Above the step zones (z-20) so the email link stays clickable now that
-        "next" covers everything but the left third — but click-through
-        elsewhere, so the rest of the lockup still advances the reel. Only the
-        mailto anchor re-enables pointer events.
+        Sits above the step zones (z-20) so the email link stays clickable now
+        that "next" covers everything but the back zone. The overlay itself is
+        click-through; Lockup re-enables pointer events on the mailto anchor
+        alone, so everything else still advances the reel.
       */}
       <div
         className="ew-grid pointer-events-none absolute inset-x-0 z-30"
         style={{ bottom: "var(--ew-lockup-bottom)" }}
       >
-        <div className={`${COLUMN} flex justify-center`}>
+        <div className={`${COLUMN} ${LOCKUP_WIDTH} flex justify-center`}>
           <Lockup style={{ width: "var(--ew-lockup-width)" }} />
         </div>
       </div>
@@ -233,15 +250,15 @@ export function Carousel({ manifest }: { manifest: Manifest }) {
           <button
             type="button"
             onClick={() => advance(-1)}
-            className="absolute inset-y-0 left-0 z-20 w-1/3 focus:outline-none"
-            style={{ cursor: CURSOR_PREV }}
+            className="absolute inset-y-0 left-0 z-20 focus:outline-none"
+            style={{ width: BACK_ZONE_WIDTH, cursor: CURSOR_PREV }}
             aria-label="Previous slide"
           />
           <button
             type="button"
             onClick={() => advance(1)}
-            className="absolute inset-y-0 right-0 left-1/3 z-20 focus:outline-none"
-            style={{ cursor: CURSOR_NEXT }}
+            className="absolute inset-y-0 right-0 z-20 focus:outline-none"
+            style={{ left: BACK_ZONE_WIDTH, cursor: CURSOR_NEXT }}
             aria-label="Next slide"
           />
         </>
@@ -258,13 +275,6 @@ type MediaLayerProps = {
   onDuration?: (seconds: number) => void;
   onEnded?: () => void;
 };
-
-/** Natural dimensions of a loaded media element, or null if not known yet. */
-function naturalSize(node: HTMLImageElement | HTMLVideoElement) {
-  const width = node instanceof HTMLImageElement ? node.naturalWidth : node.videoWidth;
-  const height = node instanceof HTMLImageElement ? node.naturalHeight : node.videoHeight;
-  return width > 0 && height > 0 ? { width, height } : null;
-}
 
 /** The single mounted frame, centred in the media column. */
 function MediaLayer({

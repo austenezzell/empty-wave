@@ -45,30 +45,11 @@
   --ew-lockup-details-scale: 1.54;
 
   /*
-   * Lockup width, as a percentage of the media column.
-   *
-   * This has to step with the column span in `COLUMN` (components/carousel.tsx),
-   * because the column goes 4/12 -> 8/12 -> 12/12 as the viewport narrows. Left
-   * at one value the lockup roughly doubles in relative width below `lg` and
-   * the services line ends up spanning the whole screen.
-   *
-   * Tuned by measuring the rendered services line: ~61% of a phone viewport,
-   * ~44% of a tablet, ~31% on desktop.
+   * Lockup width, as a percentage of the media column. This is only the
+   * fallback: `LOCKUP_WIDTH` in components/carousel.tsx steps it at the same
+   * breakpoints as the column span, which is the fact it has to track.
    */
   --ew-lockup-width: 36%;
-}
-
-/* These match the breakpoints in COLUMN, where the span steps 12 -> 8 -> 4. */
-@media (min-width: 768px) {
-  :root {
-    --ew-lockup-width: 46%;
-  }
-}
-
-@media (min-width: 1024px) {
-  :root {
-    --ew-lockup-width: 66%;
-  }
 }
 
 html,

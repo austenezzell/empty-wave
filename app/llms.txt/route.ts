@@ -42,7 +42,8 @@ description of the studio.
   return new Response(body, {
     headers: {
       "Content-Type": "text/plain; charset=utf-8",
-      "Cache-Control": "public, max-age=0, must-revalidate",
+      // Edits revalidate the manifest tag, so the CDN can hold this.
+      "Cache-Control": "public, s-maxage=300, stale-while-revalidate=86400",
     },
   });
 }

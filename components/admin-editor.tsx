@@ -11,14 +11,7 @@
  */
 
 import { useRouter } from "next/navigation";
-import {
-  useCallback,
-  useMemo,
-  useRef,
-  useState,
-  useTransition,
-  type ReactNode,
-} from "react";
+import { useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 
 import {
   addSlideAction,
@@ -30,6 +23,7 @@ import {
 } from "@/app/actions";
 import {
   kindFromMimeType,
+  naturalSize,
   UPLOAD_ACCEPT,
   type Manifest,
   type Slide,
@@ -60,21 +54,7 @@ export function AdminEditor({
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-  // Natural dimensions, measured from each preview as it loads. Not stored in
-  // the manifest — the shape of a frame is what decides how it lays out on the
-  // site, so it is worth showing here rather than leaving to guesswork.
-  const [dimensions, setDimensions] = useState<
-    Record<string, { width: number; height: number }>
-  >({});
   const [pending, startTransition] = useTransition();
-
-  const recordDimensions = useCallback(
-    (id: string, size: { width: number; height: number }) =>
-      setDimensions((current) =>
-        current[id] ? current : { ...current, [id]: size },
-      ),
-    [],
-  );
 
   const dragIndex = useRef<number | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
@@ -195,10 +175,11 @@ export function AdminEditor({
     });
   }
 
-  const busy = uploading || pending;
-  // Nothing can be saved without the service-role key, so the whole editor is
-  // read-only until Supabase is connected.
+  // Nothing can be saved without a secret key, so a disconnected editor is
+  // simply permanently busy — folding the two means every control that already
+  // respects `busy` is read-only for free.
   const locked = !storageConfigured;
+  const busy = uploading || pending || locked;
 
   return (
     <div className="flex flex-col gap-8">
@@ -233,7 +214,7 @@ export function AdminEditor({
           <button
             type="button"
             onClick={() => fileInput.current?.click()}
-            disabled={busy || locked}
+            disabled={busy}
             className="mt-3 rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:bg-ink/85 disabled:opacity-50"
           >
             Choose files
@@ -299,17 +280,7 @@ export function AdminEditor({
                   ⠿
                 </span>
 
-                <Thumbnail
-                  slide={slide}
-                  onMeasure={(size) => recordDimensions(slide.id, size)}
-                />
-
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm">{slide.name}</p>
-                  <p className="text-xs text-ink/40">
-                    {position + 1} · {describeShape(slide, dimensions[slide.id])}
-                  </p>
-                </div>
+                <SlidePreview slide={slide} position={position} />
 
                 <div
                   className={`flex shrink-0 items-center gap-1 ${locked ? "hidden" : ""}`}
@@ -384,7 +355,6 @@ export function AdminEditor({
             onClick={persistMeta}
             disabled={
               busy ||
-              locked ||
               !title.trim() ||
               !description.trim() ||
               (title === manifest.meta.title &&
@@ -415,9 +385,7 @@ export function AdminEditor({
           <button
             type="button"
             onClick={persistDuration}
-            disabled={
-              busy || locked || seconds === Math.round(manifest.imageDurationMs / 1000)
-            }
+            disabled={busy || seconds === Math.round(manifest.imageDurationMs / 1000)}
             className="rounded-md border border-ink/20 px-3 py-1.5 text-sm transition hover:bg-ink/10 disabled:opacity-40"
           >
             Save
@@ -431,82 +399,76 @@ export function AdminEditor({
   );
 }
 
-/** Human-readable shape, once the preview has reported its natural size. */
-function describeShape(
-  slide: Slide,
-  size?: { width: number; height: number },
-) {
-  if (!size) return slide.kind;
-
-  const ratio = size.width / size.height;
-  const orientation =
-    Math.abs(ratio - 1) < 0.02
-      ? "square"
-      : ratio > 1
-        ? "landscape"
-        : "portrait";
-
-  return `${slide.kind} · ${size.width}×${size.height} · ${orientation}`;
-}
-
 /**
- * Preview for one slide.
+ * One row's preview and caption.
  *
- * Square box with `object-contain` rather than a cropped strip: how a frame is
- * shaped is what decides its size on the site, so a preview that crops every
- * slide to the same rectangle hides the one property that matters.
+ * The measured size is local state: it is read from the element's own load
+ * event and used only for this row's caption, so lifting it to the parent
+ * bought a record, a callback and a prop for nothing.
  */
-function Thumbnail({
-  slide,
-  onMeasure,
-}: {
-  slide: Slide;
-  onMeasure: (size: { width: number; height: number }) => void;
-}) {
+function SlidePreview({ slide, position }: { slide: Slide; position: number }) {
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   const src = publicUrl(slide.path);
-  const shared = "max-h-full max-w-full object-contain";
+  const media = "max-h-full max-w-full object-contain";
+
+  const measure = (node: HTMLImageElement | HTMLVideoElement) =>
+    setSize(naturalSize(node));
+
+  const shape = size
+    ? `${slide.kind} · ${size.width}×${size.height} · ${orientationOf(size)}`
+    : slide.kind;
 
   return (
-    <div className="relative grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded border border-ink/10 bg-paper">
-      {slide.kind === "video" ? (
-        <>
-          {/* `preload="metadata"` pulls just enough to paint the first frame. */}
-          <video
+    <>
+      <div className="relative grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded border border-ink/10 bg-paper">
+        {slide.kind === "video" ? (
+          <>
+            {/* `preload="metadata"` pulls just enough to paint the first frame. */}
+            <video
+              src={src}
+              className={media}
+              preload="metadata"
+              muted
+              playsInline
+              onLoadedMetadata={(event) => measure(event.currentTarget)}
+            />
+            <span
+              aria-hidden
+              className="pointer-events-none absolute right-1 bottom-1 rounded-sm bg-ink/70 px-1 text-[10px] leading-4 text-paper"
+            >
+              ▶
+            </span>
+          </>
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
             src={src}
-            className={shared}
-            preload="metadata"
-            muted
-            playsInline
-            onLoadedMetadata={(event) =>
-              onMeasure({
-                width: event.currentTarget.videoWidth,
-                height: event.currentTarget.videoHeight,
-              })
-            }
+            alt=""
+            className={media}
+            // These are the full-size originals; a long reel would otherwise
+            // pull every one at full resolution to fill an 80px box.
+            loading="lazy"
+            decoding="async"
+            onLoad={(event) => measure(event.currentTarget)}
           />
-          <span
-            aria-hidden
-            className="pointer-events-none absolute right-1 bottom-1 rounded-sm bg-ink/70 px-1 text-[10px] leading-4 text-paper"
-          >
-            ▶
-          </span>
-        </>
-      ) : (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={src}
-          alt=""
-          className={shared}
-          onLoad={(event) =>
-            onMeasure({
-              width: event.currentTarget.naturalWidth,
-              height: event.currentTarget.naturalHeight,
-            })
-          }
-        />
-      )}
-    </div>
+        )}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm">{slide.name}</p>
+        <p className="text-xs text-ink/40">
+          {position + 1} · {shape}
+        </p>
+      </div>
+    </>
   );
+}
+
+/** Orientation label — friendlier than reading two numbers. */
+function orientationOf({ width, height }: { width: number; height: number }) {
+  const ratio = width / height;
+  if (Math.abs(ratio - 1) < 0.02) return "square";
+  return ratio > 1 ? "landscape" : "portrait";
 }
 
 function IconButton({

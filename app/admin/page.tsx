@@ -13,9 +13,8 @@ import { signOutAction } from "@/app/actions";
 import { AdminEditor } from "@/components/admin-editor";
 import { LoginForm } from "@/components/login-form";
 import { isSignedIn } from "@/lib/auth";
-import { getManifest } from "@/lib/media";
-import { PLACEHOLDER_MANIFEST } from "@/lib/placeholders";
-import { isStorageConfigured } from "@/lib/storage-url";
+import { getDisplayManifest } from "@/lib/media";
+import { isStorageWritable } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
 
@@ -28,15 +27,15 @@ export default async function AdminPage() {
     );
   }
 
-  const manifest = await getManifest({ fresh: true });
+  // Mirrors what the public page is showing, placeholders included — an editor
+  // reading "Nothing added yet" while photos are live is simply confusing.
+  const { manifest: displayed } = await getDisplayManifest({ fresh: true });
 
   /*
-   * Mirror what the public page is actually showing. Without Supabase the site
-   * falls back to the built-in placeholders, and an editor reading "Nothing
-   * added yet" while six photos are live is simply confusing.
+   * Editable only when storage can actually be *written* to. A URL with no
+   * secret key would otherwise unlock an editor whose every save throws.
    */
-  const storageConfigured = isStorageConfigured();
-  const displayed = storageConfigured ? manifest : PLACEHOLDER_MANIFEST;
+  const storageConfigured = isStorageWritable();
 
   return (
     <main className="mx-auto w-full max-w-2xl px-6 py-10">

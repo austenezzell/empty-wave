@@ -1,19 +1,15 @@
 /**
  * sitemap.xml.
  *
- * A single-page site, so this is one entry — but it gives crawlers a canonical
- * absolute URL and a last-modified date rather than leaving them to infer both.
+ * A single-page site, so this is one entry, and it holds nothing derived from
+ * the manifest — hence no manifest read and no reason to be dynamic.
  */
 
 import type { MetadataRoute } from "next";
 
-import { getManifest } from "@/lib/media";
 import { SITE_URL } from "@/lib/site";
 
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  // Touching the manifest ties the sitemap to the same revalidation as the page.
-  await getManifest();
-
+export default function sitemap(): MetadataRoute.Sitemap {
   return [
     {
       url: SITE_URL,

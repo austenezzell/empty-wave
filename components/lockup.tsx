@@ -1,13 +1,9 @@
 /**
  * The hand-lettered Empty Wave Media lockup.
  *
- * Rendered as four pieces, each a viewBox crop of the supplied master
- * (`lockup.svg`) with the paths outside its band stripped:
- *
- *   lockup-mark.svg      EXX, EMPTY WAVE, MEDIA
- *   lockup-services.svg  the services line
- *   lockup-email.svg     the email address
- *   lockup-colophon.svg  city and year
+ * Four pieces, each a viewBox crop of the supplied master (`design/lockup.svg`)
+ * with the paths outside its band stripped. Regenerate them all with
+ * `scripts/split-lockup.sh`, which also prints the heights below.
  *
  * The crops are taken at the blank bands between blocks, so stacking them at
  * equal scale reproduces the master exactly — the artwork and the designer's
@@ -15,24 +11,51 @@
  *
  * Splitting is what makes the email interactive: it is lettering, not text, so
  * it can only be wrapped in a link and hover-faded once it is its own element.
- * That also avoids positioning a hit area over it by measured coordinates,
- * which would drift the moment the artwork was redrawn.
  *
  * Sizing is external: the parent sets the width (`--ew-lockup-width`) and
  * `--ew-lockup-details-scale` sizes the lower three against the mark.
+ *
+ * The component is click-through apart from the email link, and says so itself
+ * rather than relying on a class set by whatever renders it — the carousel
+ * overlays this on top of its step zones, and only the link should swallow a
+ * click.
  */
 
 import type { CSSProperties } from "react";
 
-const EMAIL = "johnolsonart@gmail.com";
+import { SITE } from "@/lib/site";
 
-/** Intrinsic sizes, straight from each crop's viewBox. */
-const MARK = { width: 361.83, height: 143.6 };
-const SERVICES = { width: 361.83, height: 35.82 };
-const EMAIL_ART = { width: 361.83, height: 17.99 };
-const COLOPHON = { width: 361.83, height: 24.89 };
+/** Shared artwork width; every crop spans the master's full width. */
+const ART_WIDTH = 361.83;
 
-const PIECE = "block h-auto w-full";
+/** Crop heights, from each generated viewBox. See scripts/split-lockup.sh. */
+const HEIGHTS = {
+  mark: 143.6,
+  services: 35.82,
+  email: 17.99,
+  colophon: 24.89,
+} as const;
+
+function Piece({
+  name,
+  alt,
+  className = "",
+}: {
+  name: keyof typeof HEIGHTS;
+  alt: string;
+  className?: string;
+}) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={`/brand/lockup-${name}.svg`}
+      alt={alt}
+      width={ART_WIDTH}
+      height={HEIGHTS[name]}
+      className={`block h-auto w-full ${className}`}
+    />
+  );
+}
 
 export function Lockup({
   className = "",
@@ -42,15 +65,11 @@ export function Lockup({
   style?: CSSProperties;
 }) {
   return (
-    <div className={`flex flex-col items-center ${className}`} style={style}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/brand/lockup-mark.svg"
-        alt="Empty Wave Media"
-        width={MARK.width}
-        height={MARK.height}
-        className={PIECE}
-      />
+    <div
+      className={`pointer-events-none flex flex-col items-center ${className}`}
+      style={style}
+    >
+      <Piece name="mark" alt={SITE.name} />
 
       {/*
         The lower block is widened past 100% rather than transformed, so the
@@ -58,40 +77,22 @@ export function Lockup({
         expands upward and is never clipped.
       */}
       <div style={{ width: "calc(100% * var(--ew-lockup-details-scale))" }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/brand/lockup-services.svg"
-          alt="Photography. Print. Murals. Video Production."
-          width={SERVICES.width}
-          height={SERVICES.height}
-          className={PIECE}
-        />
+        <Piece name="services" alt={`${SITE.services.join(". ")}.`} />
 
         <a
-          href={`mailto:${EMAIL}`}
-          aria-label={`Email ${EMAIL}`}
-          title={EMAIL}
-          // Re-enables clicks inside the click-through lockup wrapper.
+          href={`mailto:${SITE.email}`}
+          aria-label={`Email ${SITE.email}`}
+          title={SITE.email}
           className="group pointer-events-auto block"
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/brand/lockup-email.svg"
-            alt={EMAIL}
-            width={EMAIL_ART.width}
-            height={EMAIL_ART.height}
-            className={`${PIECE} transition-opacity duration-200 group-hover:opacity-50 motion-reduce:transition-none`}
+          <Piece
+            name="email"
+            alt={SITE.email}
+            className="transition-opacity duration-200 group-hover:opacity-50 motion-reduce:transition-none"
           />
         </a>
 
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/brand/lockup-colophon.svg"
-          alt="Laguna Beach, CA. 2026"
-          width={COLOPHON.width}
-          height={COLOPHON.height}
-          className={PIECE}
-        />
+        <Piece name="colophon" alt={`${SITE.locality}, ${SITE.region}.`} />
       </div>
     </div>
   );

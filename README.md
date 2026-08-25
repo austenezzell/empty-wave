@@ -105,60 +105,67 @@ else resolves to an object in the Supabase bucket.
 
 ### The lockup
 
-Rendered as two pieces so their sizes can be tuned independently —
-`lockup-mark.svg` (EXX, EMPTY WAVE, MEDIA) and `lockup-details.svg` (services
-line, email, city, year). Both are viewBox crops of the supplied master
-`lockup.svg`, taken at the blank band at y=143.6, so the artwork and the
-designer's spacing are untouched; at equal scale they reproduce the master
-exactly.
+Four pieces, each a viewBox crop of the master `design/lockup.svg` with the
+paths outside its band stripped:
 
-`--ew-lockup-details-scale` sizes the lower block against the mark. At `1` the
-services line is 1.174x the width of the wordmark, which is the proportion the
+| File | Contents |
+| --- | --- |
+| `lockup-mark.svg` | EXX, EMPTY WAVE, MEDIA |
+| `lockup-services.svg` | the services line |
+| `lockup-email.svg` | the email address |
+| `lockup-colophon.svg` | city and year |
+
+The boundaries sit in the blank gaps between blocks, so stacking the crops at
+equal scale reproduces the master exactly — the artwork and the designer's
+spacing are never touched. Splitting is what makes the email interactive: it is
+lettering rather than text, so it can only be wrapped in a link and hover-faded
+once it is its own element.
+
+Regenerate after the master is redrawn:
+
+```bash
+scripts/split-lockup.sh
+```
+
+It prints the crop heights; copy them into `HEIGHTS` in
+`components/lockup.tsx`. It also asserts that the bands tile the master exactly
+and that no ink was dropped or duplicated.
+
+`--ew-lockup-details-scale` sizes the lower three pieces against the mark. At
+`1` the services line is 1.174x the width of the wordmark, the proportion the
 original standalone SVGs imply.
 
-> **Gotcha:** the details image sets `max-width: none` inline, and must keep it.
+> **Gotcha:** the lower block sets `max-width: none`, and must keep it.
 > Tailwind's Preflight applies `img { max-width: 100% }`, which silently clamps
-> the scaled width back to the container and makes this variable do nothing at
-> all — with no error and no visual hint that it is being ignored.
+> the scaled width back to the container and makes the scale variable do
+> nothing at all — with no error and no visual hint that it is being ignored.
 
-
-
-`components/lockup.tsx` renders a single supplied SVG, `public/brand/lockup.svg`
-— the EXX mark, wordmark, MEDIA rule, services line, email and colophon all in
-one file with the designer's own spacing.
-
-This replaced an earlier version that stacked four separate SVGs with hand-tuned
-gaps. Those gaps were inferred from the mocks and were always going to drift
-from the intended composition; one file carries the real spacing and cannot
-drift at all.
-
-Sizing is entirely external: the parent sets the width via `--ew-lockup-width`
-and the intrinsic `361.83 × 222.3` viewBox supplies the aspect ratio, so the
-artwork scales without ever being distorted. To swap it, overwrite the file and
-update the two intrinsic constants if the viewBox changed.
 
 ## Cursors
 
-The left and right step zones use the hand-drawn arrows in `public/cursors/`.
+The step zones use the hand-drawn arrows in `public/cursors/`. Sources are in
+`design/cursor-arrow-*.svg`.
 
-Two constraints shaped how these are delivered, and both bite silently:
+Two constraints shaped the delivery, and both fail silently — no warning, the
+cursor just stays default:
 
-- **Browsers ignore any cursor image larger than 128px** in either dimension —
-  no warning, the cursor just stays default. The source arrows are ~750px wide,
-  so they are rasterised down to 128px.
+- **Browsers ignore any cursor image larger than 128px** in either dimension.
+  The source arrows are ~750px wide, so they are rasterised down.
 - **Safari does not render SVG cursors at all**, so they ship as PNG.
 
-Regenerate them from the SVGs after any edit:
+Regenerate after editing a source:
 
 ```bash
-# render at 128px wide on a transparent background
-chrome --headless=new --default-background-color=00000000 \
-  --window-size=128,19 --screenshot=arrow-right.png page-with-svg.html
+# 128px wide, transparent background; height follows the source aspect ratio
+printf '<img src="design/cursor-arrow-right.svg" style="display:block;width:128px">' > /tmp/c.html
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --headless=new --default-background-color=00000000 --window-size=128,19 \
+  --screenshot=public/cursors/arrow-right.png /tmp/c.html
 ```
 
 The hotspot is the centre of the stroke (`64 9`), so the arrow reads as the
-pointer itself. Move it to the arrowhead end if you would rather the tail
-trailed behind.
+pointer itself rather than trailing it.
+
 
 ## Video behaviour
 

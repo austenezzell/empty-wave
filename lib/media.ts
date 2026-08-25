@@ -14,7 +14,8 @@
  * page picks the change up immediately without hammering Supabase egress.
  */
 
-import { publicUrl, SUPABASE_URL } from "@/lib/storage-url";
+import { PLACEHOLDER_MANIFEST } from "@/lib/placeholders";
+import { isStorageConfigured, publicUrl, SUPABASE_URL } from "@/lib/storage-url";
 import {
   EMPTY_MANIFEST,
   MANIFEST_PATH,
@@ -67,4 +68,24 @@ export async function saveManifest(manifest: Manifest): Promise<void> {
   });
 
   if (error) throw new Error(`Could not save the manifest: ${error.message}`);
+}
+
+/**
+ * The manifest as it should be *displayed*, with the placeholder fallback applied.
+ *
+ * The rule is subtle enough to be worth stating once: placeholders appear only
+ * while storage is unconfigured. A configured project with an empty bucket must
+ * render empty rather than serving stand-in artwork to a client's visitors.
+ *
+ * Both the public page and the admin need this, and the admin also needs to know
+ * which branch was taken, so it is returned alongside.
+ */
+export async function getDisplayManifest({ fresh = false } = {}) {
+  const storageConfigured = isStorageConfigured();
+  const manifest = await getManifest({ fresh });
+
+  return {
+    manifest: storageConfigured ? manifest : PLACEHOLDER_MANIFEST,
+    storageConfigured,
+  };
 }

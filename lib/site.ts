@@ -1,10 +1,13 @@
 /**
  * Single source of truth for site identity — name, copy, contact and origin.
  *
- * Everything that describes the site to the outside world reads from here:
- * page metadata, the structured data block, robots.txt, the sitemap and
- * llms.txt. Keeping one copy means a wording change cannot land in the page
- * title but not the share card, or in the description but not the JSON-LD.
+ * These are the *defaults*. The title and description are overridden at runtime
+ * by `manifest.meta`, which the client edits at /admin — see `DEFAULT_META` in
+ * lib/slides.ts for where the two meet. Everything else here (services, contact,
+ * locality, founder) is compile-time only and has no runtime override.
+ *
+ * Keeping one copy means a wording change cannot land in the page title but not
+ * the share card, or in the description but not the JSON-LD.
  */
 
 /**
@@ -21,6 +24,7 @@ export const SITE = {
   description:
     "Photography, print, murals, video, production. Based in Laguna Beach.",
   email: "johnolsonart@gmail.com",
+  founder: "John Olson",
   locality: "Laguna Beach",
   region: "CA",
   country: "US",

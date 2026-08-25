@@ -109,3 +109,16 @@ export function kindFromMimeType(mimeType: string): SlideKind | null {
   if (!WEB_SAFE_MIME_TYPES.has(mimeType)) return null;
   return mimeType.startsWith("image/") ? "image" : "video";
 }
+
+/**
+ * Intrinsic dimensions of a loaded media element, or null if not known yet.
+ *
+ * Images and videos expose their natural size under different property names,
+ * and both report 0 until the metadata arrives — so the zero check is the
+ * "has it loaded?" test, not a defensive extra.
+ */
+export function naturalSize(node: HTMLImageElement | HTMLVideoElement) {
+  const width = node instanceof HTMLImageElement ? node.naturalWidth : node.videoWidth;
+  const height = node instanceof HTMLImageElement ? node.naturalHeight : node.videoHeight;
+  return width > 0 && height > 0 ? { width, height } : null;
+}

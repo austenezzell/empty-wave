@@ -17,8 +17,8 @@ import { BUCKET, SUPABASE_URL } from "@/lib/storage-url";
  * literal `process.env.X` access for Next to inline it at build time.
  */
 const SUPABASE_PUBLISHABLE_KEY =
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
   "";
 
 export function browserStorage() {
