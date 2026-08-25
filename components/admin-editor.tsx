@@ -11,7 +11,14 @@
  */
 
 import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import {
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+  type ReactNode,
+} from "react";
 
 import {
   addSlideAction,
@@ -53,7 +60,21 @@ export function AdminEditor({
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  // Natural dimensions, measured from each preview as it loads. Not stored in
+  // the manifest — the shape of a frame is what decides how it lays out on the
+  // site, so it is worth showing here rather than leaving to guesswork.
+  const [dimensions, setDimensions] = useState<
+    Record<string, { width: number; height: number }>
+  >({});
   const [pending, startTransition] = useTransition();
+
+  const recordDimensions = useCallback(
+    (id: string, size: { width: number; height: number }) =>
+      setDimensions((current) =>
+        current[id] ? current : { ...current, [id]: size },
+      ),
+    [],
+  );
 
   const dragIndex = useRef<number | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
@@ -272,18 +293,21 @@ export function AdminEditor({
                   if (dragIndex.current !== null) move(dragIndex.current, position);
                   dragIndex.current = null;
                 }}
-                className="flex items-center gap-3 rounded-lg border border-ink/10 bg-ink/5 p-2"
+                className="flex items-center gap-3 rounded-lg border border-ink/10 bg-ink/5 p-2.5"
               >
                 <span className="w-6 shrink-0 cursor-grab text-center text-ink/30">
                   ⠿
                 </span>
 
-                <Thumbnail slide={slide} />
+                <Thumbnail
+                  slide={slide}
+                  onMeasure={(size) => recordDimensions(slide.id, size)}
+                />
 
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm">{slide.name}</p>
                   <p className="text-xs text-ink/40">
-                    {position + 1} · {slide.kind}
+                    {position + 1} · {describeShape(slide, dimensions[slide.id])}
                   </p>
                 </div>
 
@@ -407,17 +431,79 @@ export function AdminEditor({
   );
 }
 
-function Thumbnail({ slide }: { slide: Slide }) {
+/** Human-readable shape, once the preview has reported its natural size. */
+function describeShape(
+  slide: Slide,
+  size?: { width: number; height: number },
+) {
+  if (!size) return slide.kind;
+
+  const ratio = size.width / size.height;
+  const orientation =
+    Math.abs(ratio - 1) < 0.02
+      ? "square"
+      : ratio > 1
+        ? "landscape"
+        : "portrait";
+
+  return `${slide.kind} · ${size.width}×${size.height} · ${orientation}`;
+}
+
+/**
+ * Preview for one slide.
+ *
+ * Square box with `object-contain` rather than a cropped strip: how a frame is
+ * shaped is what decides its size on the site, so a preview that crops every
+ * slide to the same rectangle hides the one property that matters.
+ */
+function Thumbnail({
+  slide,
+  onMeasure,
+}: {
+  slide: Slide;
+  onMeasure: (size: { width: number; height: number }) => void;
+}) {
   const src = publicUrl(slide.path);
+  const shared = "max-h-full max-w-full object-contain";
 
   return (
-    <div className="h-12 w-16 shrink-0 overflow-hidden rounded bg-black">
+    <div className="relative grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded border border-ink/10 bg-paper">
       {slide.kind === "video" ? (
-        // `preload="metadata"` pulls just enough to paint a poster frame.
-        <video src={src} className="h-full w-full object-cover" preload="metadata" muted />
+        <>
+          {/* `preload="metadata"` pulls just enough to paint the first frame. */}
+          <video
+            src={src}
+            className={shared}
+            preload="metadata"
+            muted
+            playsInline
+            onLoadedMetadata={(event) =>
+              onMeasure({
+                width: event.currentTarget.videoWidth,
+                height: event.currentTarget.videoHeight,
+              })
+            }
+          />
+          <span
+            aria-hidden
+            className="pointer-events-none absolute right-1 bottom-1 rounded-sm bg-ink/70 px-1 text-[10px] leading-4 text-paper"
+          >
+            ▶
+          </span>
+        </>
       ) : (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt="" className="h-full w-full object-cover" />
+        <img
+          src={src}
+          alt=""
+          className={shared}
+          onLoad={(event) =>
+            onMeasure({
+              width: event.currentTarget.naturalWidth,
+              height: event.currentTarget.naturalHeight,
+            })
+          }
+        />
       )}
     </div>
   );
