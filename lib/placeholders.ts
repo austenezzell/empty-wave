@@ -14,11 +14,16 @@
  * All were produced by `scripts/to-web.sh` from the originals.
  */
 
-import { DEFAULT_IMAGE_DURATION_MS, type Manifest } from "@/lib/slides";
+import {
+  DEFAULT_IMAGE_DURATION_MS,
+  DEFAULT_META,
+  type Manifest,
+} from "@/lib/slides";
 
 export const PLACEHOLDER_MANIFEST: Manifest = {
   version: 1,
   imageDurationMs: DEFAULT_IMAGE_DURATION_MS,
+  meta: DEFAULT_META,
   slides: [
     { id: "ph-wave", path: "/placeholders/wave-landscape.avif", kind: "image", name: "Wave" },
     { id: "ph-brasil", path: "/placeholders/brasil.avif", kind: "image", name: "Brasil" },

@@ -19,6 +19,7 @@ import {
   deleteSlideAction,
   saveOrderAction,
   setImageDurationAction,
+  setSiteMetaAction,
 } from "@/app/actions";
 import {
   kindFromMimeType,
@@ -41,6 +42,8 @@ export function AdminEditor({ manifest }: { manifest: Manifest }) {
 
   const [slides, setSlides] = useState<Slide[]>(manifest.slides);
   const [seconds, setSeconds] = useState(Math.round(manifest.imageDurationMs / 1000));
+  const [title, setTitle] = useState(manifest.meta.title);
+  const [description, setDescription] = useState(manifest.meta.description);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -135,6 +138,19 @@ export function AdminEditor({ manifest }: { manifest: Manifest }) {
         router.refresh();
       } catch {
         setError("Could not remove that slide.");
+      }
+    });
+  }
+
+  function persistMeta() {
+    setError(null);
+    startTransition(async () => {
+      try {
+        await setSiteMetaAction({ title, description });
+        setStatus("Site details saved.");
+        router.refresh();
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "Could not save.");
       }
     });
   }
@@ -273,6 +289,58 @@ export function AdminEditor({ manifest }: { manifest: Manifest }) {
             ))}
           </ul>
         )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-xs tracking-widest text-ink/50 uppercase">
+          Site details
+        </h2>
+        <p className="text-xs text-ink/40">
+          Used for the browser tab, link previews when the site is shared, and
+          how search engines and AI assistants describe the site.
+        </p>
+
+        <label className="flex flex-col gap-1 text-sm text-ink/70">
+          Title
+          <input
+            type="text"
+            value={title}
+            maxLength={120}
+            onChange={(event) => setTitle(event.target.value)}
+            className="rounded-md border border-ink/15 bg-ink/5 px-3 py-2 text-ink outline-none focus:border-ink/40"
+          />
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm text-ink/70">
+          Description
+          <textarea
+            value={description}
+            maxLength={300}
+            rows={3}
+            onChange={(event) => setDescription(event.target.value)}
+            className="resize-y rounded-md border border-ink/15 bg-ink/5 px-3 py-2 text-ink outline-none focus:border-ink/40"
+          />
+          <span className="text-xs text-ink/35">
+            {description.length}/300 — search results usually cut off near 160.
+          </span>
+        </label>
+
+        <div>
+          <button
+            type="button"
+            onClick={persistMeta}
+            disabled={
+              busy ||
+              !title.trim() ||
+              !description.trim() ||
+              (title === manifest.meta.title &&
+                description === manifest.meta.description)
+            }
+            className="rounded-md border border-ink/20 px-3 py-1.5 text-sm transition hover:bg-ink/10 disabled:opacity-40"
+          >
+            Save details
+          </button>
+        </div>
       </section>
 
       <section className="flex flex-col gap-3">

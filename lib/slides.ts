@@ -6,6 +6,8 @@
  * `media.ts` is server-only; this file must stay free of any Supabase import.
  */
 
+import { SITE } from "@/lib/site";
+
 export const MANIFEST_PATH = "manifest.json";
 export const MANIFEST_TAG = "manifest";
 
@@ -24,15 +26,28 @@ export type Slide = {
   name: string;
 };
 
+/** Outward-facing copy, editable by the client at /admin. */
+export type SiteMeta = {
+  title: string;
+  description: string;
+};
+
 export type Manifest = {
   version: 1;
   imageDurationMs: number;
+  meta: SiteMeta;
   slides: Slide[];
+};
+
+export const DEFAULT_META: SiteMeta = {
+  title: SITE.name,
+  description: SITE.description,
 };
 
 export const EMPTY_MANIFEST: Manifest = {
   version: 1,
   imageDurationMs: DEFAULT_IMAGE_DURATION_MS,
+  meta: DEFAULT_META,
   slides: [],
 };
 
@@ -42,8 +57,15 @@ export function parseManifest(raw: unknown): Manifest {
   const candidate = raw as Partial<Manifest>;
   const slides = Array.isArray(candidate.slides) ? candidate.slides : [];
 
+  const meta = (candidate.meta ?? {}) as Partial<SiteMeta>;
+
   return {
     version: 1,
+    // Blank strings fall back too — an empty title would be worse than none.
+    meta: {
+      title: meta.title?.trim() || DEFAULT_META.title,
+      description: meta.description?.trim() || DEFAULT_META.description,
+    },
     imageDurationMs:
       typeof candidate.imageDurationMs === "number" && candidate.imageDurationMs > 0
         ? candidate.imageDurationMs

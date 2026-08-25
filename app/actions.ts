@@ -17,7 +17,12 @@ import { redirect } from "next/navigation";
 
 import { endSession, passwordIsValid, requireAdmin, startSession } from "@/lib/auth";
 import { getManifest, saveManifest } from "@/lib/media";
-import { MANIFEST_TAG, type Slide, type SlideKind } from "@/lib/slides";
+import {
+  MANIFEST_TAG,
+  type SiteMeta,
+  type Slide,
+  type SlideKind,
+} from "@/lib/slides";
 import { adminStorage } from "@/lib/supabase-admin";
 
 /** Strip a filename down to something safe to use as an object path. */
@@ -126,5 +131,25 @@ export async function setImageDurationAction(seconds: number) {
   const manifest = await getManifest({ fresh: true });
 
   await saveManifest({ ...manifest, imageDurationMs: clamped * 1000 });
+  revalidateTag(MANIFEST_TAG, "max");
+}
+
+/**
+ * Update the outward-facing copy — the page title and description.
+ *
+ * These feed the browser tab, the link preview, the structured data block and
+ * llms.txt, so they are worth letting the client change without a deploy.
+ */
+export async function setSiteMetaAction(meta: SiteMeta) {
+  await requireAdmin();
+
+  const title = meta.title.trim().slice(0, 120);
+  const description = meta.description.trim().slice(0, 300);
+  if (!title || !description) {
+    throw new Error("Title and description cannot be empty.");
+  }
+
+  const manifest = await getManifest({ fresh: true });
+  await saveManifest({ ...manifest, meta: { title, description } });
   revalidateTag(MANIFEST_TAG, "max");
 }
