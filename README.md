@@ -185,6 +185,30 @@ The hotspot is the centre of the stroke (`64 9`), so the arrow reads as the
 pointer itself rather than trailing it.
 
 
+## Preloading
+
+Three layers, so a frame is almost always already in cache when it is shown:
+
+1. **`preconnect`** to the storage host, and a **`preload`** for the first
+   frame, both rendered into the HTML — so the download starts before the
+   bundle has parsed and hydrated, rather than after.
+2. **Immediate neighbours** (next, next-but-one, previous) are fetched as soon
+   as the index changes, so stepping either way is instant.
+3. **Everything else** is fetched when the browser reports idle, so it never
+   competes with the frame being looked at.
+
+Preloaded elements are held in a module-level `Map`. That is load-bearing: an
+`Image` that goes out of scope can be collected and its fetch abandoned before
+it reaches the HTTP cache, silently undoing the preload.
+
+Video is warmed to **metadata only** — the clips are the expensive files, and
+`+faststart` puts the header at the front, so a small read removes most of the
+startup delay without pulling the whole clip.
+
+> **Cost.** Layer 3 means a visitor who leaves after two seconds still downloads
+> every still. At roughly 2MB of stills that is ~2,500 visits against the 5GB
+> monthly egress. If that ever bites, drop the idle pass and keep layers 1–2.
+
 ## Video behaviour
 
 A video plays **to its natural end**, then the reel advances. It is never cut

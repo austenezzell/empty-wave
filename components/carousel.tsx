@@ -119,6 +119,49 @@ function widthPercentForRatio(ratio: number) {
   return Math.min(100, 100 * Math.sqrt(ratio / REFERENCE_RATIO));
 }
 
+/**
+ * Media the browser has already been asked to fetch, kept alive across renders.
+ *
+ * Holding the elements matters: an `Image` that goes out of scope can be
+ * collected and its fetch abandoned before it lands in the HTTP cache, quietly
+ * undoing the preload.
+ */
+const warmed = new Map<string, HTMLImageElement | HTMLVideoElement>();
+
+function warm(slide: Slide) {
+  const url = publicUrl(slide.path);
+  if (warmed.has(url)) return;
+
+  if (slide.kind === "image") {
+    const image = new window.Image();
+    image.decoding = "async";
+    image.src = url;
+    warmed.set(url, image);
+    return;
+  }
+
+  /*
+   * Video gets metadata only. The clips are the expensive files, and with
+   * `+faststart` (see scripts/to-web.sh) the header sits at the front, so this
+   * is a small read that still removes most of the startup delay.
+   */
+  const video = document.createElement("video");
+  video.preload = "metadata";
+  video.muted = true;
+  video.src = url;
+  warmed.set(url, video);
+}
+
+/** `requestIdleCallback` where it exists, a timeout where it does not. */
+function whenIdle(run: () => void) {
+  if (typeof window.requestIdleCallback === "function") {
+    const handle = window.requestIdleCallback(run, { timeout: 2000 });
+    return () => window.cancelIdleCallback(handle);
+  }
+  const handle = window.setTimeout(run, 400);
+  return () => window.clearTimeout(handle);
+}
+
 export function Carousel({ manifest }: { manifest: Manifest }) {
   const { slides, imageDurationMs } = manifest;
 
@@ -185,15 +228,23 @@ export function Carousel({ manifest }: { manifest: Manifest }) {
     return () => window.clearTimeout(timer);
   }, [current, visible, imageDurationMs, videoDurationMs, slides.length, advance]);
 
-  // Warm the next image so the gap between frames stays short. Videos are
-  // deliberately left alone — prefetching those is the expensive case.
+  /*
+   * Keep the reel ahead of the viewer.
+   *
+   * The immediate neighbours are fetched at once, so stepping either way is
+   * instant. The remainder waits for the browser to be idle, so it never
+   * competes with the frame actually being shown — which matters most on the
+   * first paint, and on a phone.
+   */
   useEffect(() => {
     if (slides.length < 2) return;
-    const next = slides[(index + 1) % slides.length];
-    if (next?.kind !== "image") return;
 
-    const preloader = new window.Image();
-    preloader.src = publicUrl(next.path);
+    const count = slides.length;
+    for (const offset of [1, 2, -1]) {
+      warm(slides[(index + offset + count) % count]);
+    }
+
+    return whenIdle(() => slides.forEach(warm));
   }, [index, slides]);
 
   // Safari rejects autoplay unless the element is muted before play() is called.
@@ -469,6 +520,8 @@ function MediaLayer({
           alt={slide.name}
           className={mediaClass}
           style={mediaStyle}
+          // Outranks the idle preloads; this is the one being looked at.
+          fetchPriority={visible ? "auto" : "high"}
           onLoad={handleLoad}
           onError={onReady}
           draggable={false}

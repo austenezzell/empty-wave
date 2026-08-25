@@ -12,6 +12,7 @@ import { GridOverlay } from "@/components/grid-overlay";
 import { getDisplayManifest } from "@/lib/media";
 import { SITE, SITE_URL } from "@/lib/site";
 import type { SiteMeta } from "@/lib/slides";
+import { publicUrl, SUPABASE_URL } from "@/lib/storage-url";
 
 /**
  * Structured data.
@@ -57,9 +58,28 @@ function structuredData(meta: SiteMeta) {
 
 export default async function HomePage() {
   const { manifest } = await getDisplayManifest();
+  const first = manifest.slides[0];
 
   return (
     <>
+      {/*
+        Start the first frame downloading from the HTML itself, rather than
+        waiting for the bundle to parse, hydrate and only then ask for it. React
+        hoists these into <head>.
+      */}
+      {SUPABASE_URL && (
+        <link rel="preconnect" href={SUPABASE_URL} crossOrigin="anonymous" />
+      )}
+      {first && (
+        <link
+          rel="preload"
+          // Whichever kind leads the reel: a video first slide is just as much
+          // a cold start as an image one.
+          as={first.kind === "image" ? "image" : "video"}
+          href={publicUrl(first.path)}
+          fetchPriority="high"
+        />
+      )}
       <script
         type="application/ld+json"
         // Serialised from local constants, so there is no untrusted input here.
