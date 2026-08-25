@@ -272,23 +272,33 @@ nothing (no browser draws TIFF; `.mov` plays only in Safari). Convert first.
 
 ## Share images and icons
 
-`app/opengraph-image.png` and `app/twitter-image.png` (1200x630) are the link
-preview; `app/icon.png`, `app/apple-icon.png` and `app/favicon.ico` are the
-browser icons. All are picked up by Next's file conventions — no tags to write.
+`app/opengraph-image.tsx` generates the share image at request time: it picks a
+random still from the manifest and reproduces the poster around it — same paper,
+same equal-area sizing, same lockup — so a shared link looks like the site and
+differs each time it is generated. `app/twitter-image.tsx` re-exports it.
 
-The share image is a **screenshot of the real poster**, so the preview can never
-drift from the actual design. Regenerate it with:
+Two constraints shaped it, and both fail silently:
 
-```bash
-scripts/make-og.sh          # second slide (default)
-scripts/make-og.sh 20000    # a later frame, if you want a different photo
-```
+- **Satori cannot decode AVIF**, and every slide is AVIF. It draws nothing at
+  all — no error, just a blank frame. Each slide is therefore fetched through
+  Next's image optimiser, which returns JPEG when the requester does not
+  advertise support for modern formats. That is what `images.remotePatterns` in
+  `next.config.ts` is for; the carousel itself still uses plain `<img>`.
+- **Satori has no `inset` shorthand.** `inset: 0` is ignored and the element
+  collapses to the top-left corner. Use `top`/`left`/`width`/`height`.
 
-It builds and serves a production bundle to do this, because `pnpm dev` paints
-Next's dev indicator into the corner of the frame.
+Satori also needs explicit dimensions, and the manifest does not record image
+sizes, so the route reads them from the JPEG's own SOF header.
 
-Set `NEXT_PUBLIC_SITE_URL` in the deployed environment. Without it, Next builds
-share-image URLs against `localhost` and previews break everywhere else.
+Note that crawlers cache aggressively, so a given scrape keeps whichever photo
+it first saw; "different every time" means per generation, not per view.
+
+`app/icon.png`, `app/apple-icon.png` and `app/favicon.ico` are the browser
+icons, picked up by Next's file conventions.
+
+Set `NEXT_PUBLIC_SITE_URL` in the deployed environment for canonical and
+metadata URLs. The share image itself derives its origin from the request
+headers, so it works on preview deployments too.
 
 ## Deploying
 
