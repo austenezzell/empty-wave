@@ -7,12 +7,19 @@
  * down to public HTTP endpoints, so the session check has to live in the action
  * itself rather than only in the page that renders the form.
  *
+ * Every write ends with `updateTag`, not `revalidateTag`. `revalidateTag` uses
+ * stale-while-revalidate — it keeps serving the old manifest while the new one
+ * regenerates behind it, so a client who just saved reloads the site and still
+ * sees the previous state. `updateTag` expires immediately, which is what
+ * read-your-own-writes needs; it is Server-Action-only, which every write here
+ * already is.
+ *
  * Uploads are handled as signed upload URLs rather than multipart posts: the
  * browser sends the file straight to Supabase, because Vercel rejects
  * serverless request bodies over 4.5MB and video files comfortably exceed that.
  */
 
-import { revalidateTag } from "next/cache";
+import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 
 import {
@@ -94,7 +101,7 @@ export async function addSlideAction(slide: {
   };
 
   await saveManifest({ ...manifest, slides: [...manifest.slides, entry] });
-  revalidateTag(MANIFEST_TAG, "max");
+  updateTag(MANIFEST_TAG);
 }
 
 /**
@@ -116,7 +123,7 @@ export async function saveOrderAction(orderedIds: string[]) {
   const untouched = manifest.slides.filter((slide) => !orderedIds.includes(slide.id));
 
   await saveManifest({ ...manifest, slides: [...reordered, ...untouched] });
-  revalidateTag(MANIFEST_TAG, "max");
+  updateTag(MANIFEST_TAG);
 }
 
 /** Remove a slide from the manifest and delete the underlying object. */
@@ -135,7 +142,7 @@ export async function deleteSlideAction(id: string) {
   // Drop the file after the manifest, so a failure here leaves an orphaned
   // object rather than a slide pointing at nothing.
   await adminStorage().remove([target.path]);
-  revalidateTag(MANIFEST_TAG, "max");
+  updateTag(MANIFEST_TAG);
 }
 
 /** Change how long still images hold the screen. */
@@ -146,7 +153,7 @@ export async function setImageDurationAction(seconds: number) {
   const manifest = await getManifest({ fresh: true });
 
   await saveManifest({ ...manifest, imageDurationMs: clamped * 1000 });
-  revalidateTag(MANIFEST_TAG, "max");
+  updateTag(MANIFEST_TAG);
 }
 
 /**
@@ -166,5 +173,5 @@ export async function setSiteMetaAction(meta: SiteMeta) {
 
   const manifest = await getManifest({ fresh: true });
   await saveManifest({ ...manifest, meta: { title, description } });
-  revalidateTag(MANIFEST_TAG, "max");
+  updateTag(MANIFEST_TAG);
 }

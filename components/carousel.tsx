@@ -31,6 +31,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import type React from "react";
 
 import { Lockup } from "@/components/lockup";
 import { publicUrl } from "@/lib/storage-url";
@@ -44,6 +45,14 @@ import { naturalSize, type Manifest, type Slide } from "@/lib/slides";
  * while the duration is still unknown.
  */
 const VIDEO_OVERRUN_GRACE_MS = 2_000;
+
+/**
+ * How far a pointer must travel horizontally to count as a swipe.
+ *
+ * It also has to beat the vertical distance, so a mostly-vertical drag is never
+ * read as a slide change.
+ */
+const SWIPE_MIN_PX = 45;
 const VIDEO_UNKNOWN_DURATION_MS = 60_000;
 
 /**
@@ -196,6 +205,45 @@ export function Carousel({ manifest }: { manifest: Manifest }) {
     if (attempt) attempt.catch(() => undefined);
   }, [current, index]);
 
+  /*
+   * Swipe, via pointer events so one code path covers touch and mouse.
+   *
+   * `swiped` suppresses the click that a touch generates after pointerup —
+   * without it every swipe would also trigger the tap zone underneath, and a
+   * swipe that began over the email would follow the mailto link.
+   */
+  const swipeStart = useRef<{ x: number; y: number } | null>(null);
+  const swiped = useRef(false);
+
+  const onPointerDown = useCallback((event: React.PointerEvent) => {
+    swipeStart.current = { x: event.clientX, y: event.clientY };
+    swiped.current = false;
+  }, []);
+
+  const onPointerUp = useCallback(
+    (event: React.PointerEvent) => {
+      const start = swipeStart.current;
+      swipeStart.current = null;
+      if (!start) return;
+
+      const dx = event.clientX - start.x;
+      const dy = event.clientY - start.y;
+      if (Math.abs(dx) < SWIPE_MIN_PX || Math.abs(dx) <= Math.abs(dy)) return;
+
+      swiped.current = true;
+      // Swiping left pulls the next frame in, as with any reel.
+      advance(dx < 0 ? 1 : -1);
+    },
+    [advance],
+  );
+
+  const onClickCapture = useCallback((event: React.MouseEvent) => {
+    if (!swiped.current) return;
+    swiped.current = false;
+    event.preventDefault();
+    event.stopPropagation();
+  }, []);
+
   const handleReady = useCallback(() => setVisible(true), []);
   const handleDuration = useCallback((seconds: number) => {
     // Live streams report Infinity; leave the fallback in place for those.
@@ -204,7 +252,15 @@ export function Carousel({ manifest }: { manifest: Manifest }) {
   const handleEnded = useCallback(() => advance(1), [advance]);
 
   return (
-    <main className="relative min-h-dvh overflow-hidden bg-paper">
+    <main
+      className="relative min-h-dvh touch-pan-y overflow-hidden bg-paper"
+      onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
+      onPointerCancel={() => {
+        swipeStart.current = null;
+      }}
+      onClickCapture={onClickCapture}
+    >
       {/* The media stage fills the viewport so each frame centres against it. */}
       <div className="ew-grid absolute inset-0">
         <div className={`${COLUMN} relative`}>
