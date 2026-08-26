@@ -1,3 +1,4 @@
 allowBuilds:
-  sharp: false
+  # sharp is used by app/opengraph-image.tsx to decode AVIF; it needs its build.
+  sharp: true
   unrs-resolver: false

@@ -5,18 +5,22 @@
  * lockup pinned near the bottom — so a shared link looks like the site rather
  * than a separate graphic, and looks different each time it is generated.
  *
- * Two constraints shape the implementation:
+ * Satori, which renders this, cannot decode AVIF — and every slide is AVIF. It
+ * draws nothing at all rather than erroring, so the frame comes out blank.
  *
- * 1. Satori (which renders this) cannot decode AVIF, and every slide is AVIF.
- *    It silently draws nothing — no error, just a blank frame. Each slide is
- *    therefore routed through Next's image optimiser, which returns JPEG when
- *    the requester does not advertise support for modern formats.
- * 2. Satori needs explicit dimensions to lay an image out, and the manifest
- *    does not record them, so the JPEG's own header is read for its size.
+ * Slides are therefore decoded with sharp and handed over as JPEG. An earlier
+ * version routed them through Next's image optimiser instead, which works in
+ * `next dev` but not in production: Vercel's optimiser passes AVIF through
+ * untouched whatever `Accept` is sent, so the photograph silently vanished on
+ * the deployed site. Decoding here keeps dev and production identical.
+ *
+ * sharp also reports the intrinsic size, which Satori needs to lay the image
+ * out and the manifest does not record.
  */
 
 import { headers } from "next/headers";
 import { ImageResponse } from "next/og";
+import sharp from "sharp";
 
 import { getDisplayManifest } from "@/lib/media";
 import { SITE } from "@/lib/site";
@@ -28,6 +32,11 @@ export const contentType = "image/png";
 
 // Regenerate per request so repeat shares do not all get the same photograph.
 export const dynamic = "force-dynamic";
+// sharp is a native module; it cannot run on the edge runtime.
+export const runtime = "nodejs";
+
+/** Widest the photograph is ever drawn here, so there is no point decoding larger. */
+const SOURCE_WIDTH = 720;
 
 /* The poster's geometry at 1200x630, from the same tokens the site uses. */
 const MARGIN = 36; // clamp(1rem, 3vw, 3rem) at 1200
@@ -48,30 +57,6 @@ const PIECES = [
   { name: "email", height: 17.99, scaled: true },
   { name: "colophon", height: 24.89, scaled: true },
 ] as const;
-
-/** Width and height from a JPEG's SOF marker. */
-function jpegSize(bytes: Uint8Array) {
-  let offset = 2; // skip SOI
-  while (offset + 9 < bytes.length) {
-    if (bytes[offset] !== 0xff) {
-      offset += 1;
-      continue;
-    }
-    const marker = bytes[offset + 1];
-    const length = (bytes[offset + 2] << 8) | bytes[offset + 3];
-    // SOF0..SOF15, excluding the non-frame markers in that range.
-    const isFrame =
-      marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker);
-    if (isFrame) {
-      return {
-        height: (bytes[offset + 5] << 8) | bytes[offset + 6],
-        width: (bytes[offset + 7] << 8) | bytes[offset + 8],
-      };
-    }
-    offset += 2 + length;
-  }
-  return null;
-}
 
 /** Equal-area sizing, matching `widthPercentForRatio` in the carousel. */
 function frameSize(ratio: number) {
@@ -114,15 +99,28 @@ export default async function OpengraphImage() {
     const source = slide.path.startsWith("/")
       ? `${origin}${slide.path}`
       : `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/media/${slide.path}`;
-    // 640 is ample for a 364px-wide frame and keeps the round trip small.
-    const url = `${origin}/_next/image?url=${encodeURIComponent(source)}&w=640&q=75`;
 
-    const response = await fetch(url, { headers: { Accept: "*/*" } });
-    if (response.ok) {
-      const measured = jpegSize(new Uint8Array(await response.arrayBuffer()));
-      if (measured) {
-        frame = { url, ...frameSize(measured.width / measured.height) };
+    try {
+      const response = await fetch(source);
+      if (response.ok) {
+        const input = sharp(Buffer.from(await response.arrayBuffer()));
+        const { width, height } = await input.metadata();
+
+        if (width && height) {
+          const jpeg = await input
+            .resize({ width: SOURCE_WIDTH, withoutEnlargement: true })
+            .jpeg({ quality: 80 })
+            .toBuffer();
+
+          frame = {
+            url: `data:image/jpeg;base64,${jpeg.toString("base64")}`,
+            ...frameSize(width / height),
+          };
+        }
       }
+    } catch {
+      // A frame that cannot be decoded is not worth failing the card over —
+      // the lockup on bare paper is a reasonable fallback.
     }
   }
 
