@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 #
-# Split the master lockup into the four crops the site renders.
+# Split the master lockup into the crops the site renders.
 #
 #   design/lockup.svg  ->  public/brand/lockup-{mark,services,email,colophon}.svg
+#                      ->  public/brand/lockup-monogram.svg (a re-crop of mark)
 #
 # Each crop keeps only the paths whose band it covers, and carries a viewBox
 # framing that band. The boundaries sit in the blank gaps between blocks, so
@@ -31,6 +32,17 @@ BANDS = [
     ("email",    179.42, 197.41),
     ("colophon", 197.41, TOTAL),
 ]
+
+# A tight crop of the monogram alone, for the places too small to carry the
+# lettering — the admin sidebar. Unlike BANDS this one does not tile: it
+# re-crops the top of the mark, so its paths are deliberately a second copy.
+#
+# The split sits in the blank gap the master leaves under the monogram (40.26
+# to 56.26 in viewBox units), and the window is the monogram's own ink bounds
+# plus two units of margin on all four sides. Re-measure both if the master is
+# redrawn: render the mark and look for the fully blank rows.
+MONOGRAM_SPLIT = 48.00
+MONOGRAM_VIEWBOX = (124.00, -2.00, 108.00, 44.00)
 
 src = SRC.read_text()
 elements = re.findall(r"<path[^>]*/>", src)
@@ -77,6 +89,21 @@ for name, lo, hi in BANDS:
     )
     total_paths += len(buckets[name])
     print(f"  {out.name:<26} {len(buckets[name]):>5}  {height:>7.2f}")
+
+mono = [
+    element
+    for element, d in zip(elements, paths)
+    if (m := first_move.match(d)) and float(m.group(2)) < MONOGRAM_SPLIT
+]
+mx, my, mw, mh = MONOGRAM_VIEWBOX
+mono_out = OUT / "lockup-monogram.svg"
+mono_out.write_text(
+    f'<svg xmlns="http://www.w3.org/2000/svg" '
+    f'viewBox="{mx:g} {my:g} {mw:g} {mh:g}">\n'
+    + "\n".join(mono)
+    + "\n</svg>\n"
+)
+print(f"  {mono_out.name:<26} {len(mono):>5}  {mh:>7.2f}  (re-crop of mark)")
 
 if unplaced:
     print(f"  ({unplaced} paths had unreadable coordinates and were kept in every crop)")
