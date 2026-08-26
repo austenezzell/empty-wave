@@ -213,162 +213,179 @@ export function AdminMedia({
   const busy = uploading || pending || locked;
 
   return (
-    <div className="flex flex-col gap-8">
+    <>
+      {/*
+        Out of flow on purpose: in the column it appeared and disappeared above
+        the grid, which nudged both columns off the sidebar every time anything
+        saved. Pinned to the same page margin instead.
+      */}
       {(status || error) && (
-        <p className={`text-sm ${error ? "text-red-700" : "text-ink/60"}`}>
+        <p
+          role={error ? "alert" : "status"}
+          className={`fixed right-4 bottom-4 z-30 max-w-xs rounded-lg border border-ink/10 bg-paper/90 px-3 py-2 text-sm backdrop-blur ${
+            error ? "text-red-700" : "text-ink/60"
+          }`}
+        >
           {error ?? status}
         </p>
       )}
 
       {/*
-        Two columns from `lg`: the site's own copy on the left, the reel it
-        describes on the right. Below that they stack in the same order.
+        Two columns from `lg`: the drop zone and shared timing on the left,
+        the ordered reel on the right, which is the taller of the two and the
+        one worth the extra width. Below that they stack in the same order.
       */}
-      <section className="flex flex-col gap-3">
-        <h2 className="text-xs tracking-widest text-ink/50 uppercase">Add media</h2>
+      <div className="grid gap-4 lg:grid-cols-5">
+        <div className="flex flex-col gap-4 lg:col-span-2">
+          <section className="flex flex-col gap-3 rounded-xl border border-ink/10 p-5">
+            <h2 className="text-xs tracking-widest text-ink/50 uppercase">Add media</h2>
 
-        <div
-          onDragOver={(event) => event.preventDefault()}
-          onDrop={(event) => {
-            event.preventDefault();
-            if (!locked) void uploadFiles(event.dataTransfer.files);
-          }}
-          className="rounded-lg border border-dashed border-ink/25 p-6 text-center"
-        >
-          <p className="text-sm text-ink/60">Drop photos or videos here, or</p>
-          <button
-            type="button"
-            onClick={() => fileInput.current?.click()}
-            disabled={busy}
-            className="mt-3 rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:bg-ink/85 disabled:opacity-50"
-          >
-            Choose files
-          </button>
-          <p className="mt-3 text-xs text-ink/35">
-            JPEG, PNG, WebP, AVIF, MP4 or WebM — up to 50MB each.
-          </p>
-
-          <input
-            ref={fileInput}
-            type="file"
-            accept={UPLOAD_ACCEPT}
-            multiple
-            hidden
-            onChange={(event) => void uploadFiles(event.target.files)}
-          />
-        </div>
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="text-xs tracking-widest text-ink/50 uppercase">
-            Order ({slides.length})
-          </h2>
-          {orderIsDirty && !locked && (
-            <button
-              type="button"
-              onClick={persistOrder}
-              disabled={busy}
-              className="rounded-md bg-ink px-3 py-1.5 text-sm font-medium text-paper transition hover:bg-ink/85 disabled:opacity-50"
+            <div
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault();
+                if (!locked) void uploadFiles(event.dataTransfer.files);
+              }}
+              className="rounded-lg border border-dashed border-ink/25 px-6 py-12 text-center"
             >
-              Save order
-            </button>
-          )}
-        </div>
-
-        {slides.length === 0 ? (
-          <p className="text-sm text-ink/40">Nothing added yet.</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {slides.map((slide, position) => (
-              <li
-                key={slide.id}
-                draggable={!locked}
-                onDragStart={() => {
-                  dragIndex.current = position;
-                }}
-                onDragOver={(event) => event.preventDefault()}
-                onDrop={(event) => {
-                  event.preventDefault();
-                  if (dragIndex.current !== null) move(dragIndex.current, position);
-                  dragIndex.current = null;
-                }}
-                className="flex items-center gap-3 rounded-lg border border-ink/10 bg-ink/5 p-2.5"
+              <p className="text-sm text-ink/60">Drop photos or videos here, or</p>
+              <button
+                type="button"
+                onClick={() => fileInput.current?.click()}
+                disabled={busy}
+                className="mt-3 rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:bg-ink/85 disabled:opacity-50"
               >
-                <span className="w-6 shrink-0 cursor-grab text-center text-ink/30">
-                  ⠿
-                </span>
+                Choose files
+              </button>
+              <p className="mt-3 text-xs text-ink/35">
+                JPEG, PNG, WebP, AVIF, MP4 or WebM — up to 50MB each.
+              </p>
 
-                <SlidePreview slide={slide} position={position} />
+              <input
+                ref={fileInput}
+                type="file"
+                accept={UPLOAD_ACCEPT}
+                multiple
+                hidden
+                onChange={(event) => void uploadFiles(event.target.files)}
+              />
+            </div>
+          </section>
 
-                {slide.kind === "video" && (
-                  <SlideDuration
-                    slide={slide}
-                    disabled={busy}
-                    onSave={(seconds) => persistSlideDuration(slide.id, seconds)}
-                  />
-                )}
-
-                <div
-                  className={`flex shrink-0 items-center gap-1 ${locked ? "hidden" : ""}`}
-                >
-                  <IconButton
-                    label="Move up"
-                    disabled={position === 0 || busy}
-                    onClick={() => move(position, position - 1)}
-                  >
-                    ↑
-                  </IconButton>
-                  <IconButton
-                    label="Move down"
-                    disabled={position === slides.length - 1 || busy}
-                    onClick={() => move(position, position + 1)}
-                  >
-                    ↓
-                  </IconButton>
-                  <IconButton
-                    label={`Remove ${slide.name}`}
-                    disabled={busy}
-                    onClick={() => remove(slide)}
-                  >
-                    ×
-                  </IconButton>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-xs tracking-widest text-ink/50 uppercase">Timing</h2>
-        <div className="flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-2 text-sm text-ink/70">
-            Photos hold for
-            <input
-              type="number"
-              min={1}
-              max={60}
-              value={seconds}
-              onChange={(event) => setSeconds(Number(event.target.value))}
-              className="w-20 rounded-md border border-ink/15 bg-ink/5 px-2 py-1 text-ink outline-none focus:border-ink/40"
-            />
-            seconds
-          </label>
-          <button
-            type="button"
-            onClick={persistDuration}
-            disabled={busy || seconds === Math.round(manifest.imageDurationMs / 1000)}
-            className="rounded-md border border-ink/20 px-3 py-1.5 text-sm transition hover:bg-ink/10 disabled:opacity-40"
-          >
-            Save
-          </button>
+          <section className="flex flex-col gap-3 rounded-xl border border-ink/10 p-5">
+            <h2 className="text-xs tracking-widest text-ink/50 uppercase">Timing</h2>
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2 text-sm text-ink/70">
+                Photos hold for
+                <input
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={seconds}
+                  onChange={(event) => setSeconds(Number(event.target.value))}
+                  className="w-20 rounded-md border border-ink/15 bg-ink/5 px-2 py-1 text-ink outline-none focus:border-ink/40"
+                />
+                seconds
+              </label>
+              <button
+                type="button"
+                onClick={persistDuration}
+                disabled={busy || seconds === Math.round(manifest.imageDurationMs / 1000)}
+                className="rounded-md border border-ink/20 px-3 py-1.5 text-sm transition hover:bg-ink/10 disabled:opacity-40"
+              >
+                Save
+              </button>
+            </div>
+            <p className="text-xs text-ink/35">
+              Videos always play to the end, so this only affects photos.
+            </p>
+          </section>
         </div>
-        <p className="text-xs text-ink/35">
-          Videos always play to the end, so this only affects photos.
-        </p>
-      </section>
-    </div>
+
+        <div className="lg:col-span-3">
+          <section className="flex flex-col gap-3 rounded-xl border border-ink/10 p-5">
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-xs tracking-widest text-ink/50 uppercase">
+                Order ({slides.length})
+              </h2>
+              {orderIsDirty && !locked && (
+                <button
+                  type="button"
+                  onClick={persistOrder}
+                  disabled={busy}
+                  className="rounded-md bg-ink px-3 py-1.5 text-sm font-medium text-paper transition hover:bg-ink/85 disabled:opacity-50"
+                >
+                  Save order
+                </button>
+              )}
+            </div>
+
+            {slides.length === 0 ? (
+              <p className="text-sm text-ink/40">Nothing added yet.</p>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {slides.map((slide, position) => (
+                  <li
+                    key={slide.id}
+                    draggable={!locked}
+                    onDragStart={() => {
+                      dragIndex.current = position;
+                    }}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      if (dragIndex.current !== null) move(dragIndex.current, position);
+                      dragIndex.current = null;
+                    }}
+                    className="flex items-center gap-3 rounded-lg border border-ink/10 bg-ink/5 p-2.5"
+                  >
+                    <span className="w-6 shrink-0 cursor-grab text-center text-ink/30">
+                      ⠿
+                    </span>
+
+                    <SlidePreview slide={slide} position={position} />
+
+                    {slide.kind === "video" && (
+                      <SlideDuration
+                        slide={slide}
+                        disabled={busy}
+                        onSave={(seconds) => persistSlideDuration(slide.id, seconds)}
+                      />
+                    )}
+
+                    <div
+                      className={`flex shrink-0 items-center gap-1 ${locked ? "hidden" : ""}`}
+                    >
+                      <IconButton
+                        label="Move up"
+                        disabled={position === 0 || busy}
+                        onClick={() => move(position, position - 1)}
+                      >
+                        ↑
+                      </IconButton>
+                      <IconButton
+                        label="Move down"
+                        disabled={position === slides.length - 1 || busy}
+                        onClick={() => move(position, position + 1)}
+                      >
+                        ↓
+                      </IconButton>
+                      <IconButton
+                        label={`Remove ${slide.name}`}
+                        disabled={busy}
+                        onClick={() => remove(slide)}
+                      >
+                        ×
+                      </IconButton>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
+      </div>
+    </>
   );
 }
 

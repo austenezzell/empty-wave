@@ -6,7 +6,7 @@
  * accidentally ship unprotected.
  */
 
-import { AdminNav } from "@/components/admin-nav";
+import { AdminShell } from "@/components/admin-shell";
 import { LoginForm } from "@/components/login-form";
 import { isSignedIn, missingAuthConfig } from "@/lib/auth";
 import { isStorageWritable } from "@/lib/supabase-admin";
@@ -39,13 +39,10 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="min-h-dvh">
-      <AdminNav />
-
-      {/* Clears the fixed sidebar on desktop; it sits above the content below. */}
-      <main className="px-6 py-10 lg:pl-60">
-        {!isStorageWritable() && (
-          <div className="mb-8 max-w-2xl rounded-lg border border-ink/20 bg-ink/5 p-4 text-sm">
+    <AdminShell
+      notice={
+        !isStorageWritable() && (
+          <div className="mb-4 max-w-2xl rounded-xl border border-ink/20 bg-ink/5 p-4 text-sm">
             <p className="font-medium">Supabase is not connected.</p>
             <p className="mt-1 text-ink/70">
               Nothing here can be saved yet, and the site is showing its
@@ -53,9 +50,10 @@ export default async function AdminLayout({
               <code>.env.local</code>, then restart the dev server.
             </p>
           </div>
-        )}
-        {children}
-      </main>
-    </div>
+        )
+      }
+    >
+      {children}
+    </AdminShell>
   );
 }
